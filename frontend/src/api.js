@@ -30,8 +30,13 @@ export const api = {
   afd: (lat, lon) => getJson("/api/afd", { lat, lon }),
   alerts: (lat, lon) => getJson("/api/alerts", { lat, lon }),
   outlook: (day, hazard) => getJson("/api/outlook", { day, hazard }),
-  mesoscaleDiscussions: () => getJson("/api/mesoscale-discussions"),
-  watches: () => getJson("/api/watches"),
+  // lat/lon are optional — when given, the backend filters to items that
+  // mention that state (SPC's feeds don't carry structured geometry, just
+  // text, so "mentions the state by name" is the filter). Omit params
+  // entirely rather than passing lat=undefined, which would otherwise be
+  // sent as the literal string "undefined".
+  mesoscaleDiscussions: (lat, lon) => getJson("/api/mesoscale-discussions", lat != null && lon != null ? { lat, lon } : {}),
+  watches: (lat, lon) => getJson("/api/watches", lat != null && lon != null ? { lat, lon } : {}),
   geocode: (q) => getJson("/api/geocode", { q }),
   radarSite: (lat, lon) => getJson("/api/radar-products/site", { lat, lon }),
 };

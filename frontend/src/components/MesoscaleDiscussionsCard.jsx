@@ -15,31 +15,38 @@ import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
 
-export default function MesoscaleDiscussionsCard({ refreshTick }) {
+export default function MesoscaleDiscussionsCard({ location, refreshTick }) {
   const [items, setItems] = useState(null);
+  const [stateName, setStateName] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
     api
-      .mesoscaleDiscussions()
-      .then((d) => !cancelled && setItems(d.items))
+      .mesoscaleDiscussions(location?.lat, location?.lon)
+      .then((d) => {
+        if (cancelled) return;
+        setItems(d.items);
+        setStateName(d.filtered_to_state);
+      })
       .catch((err) => !cancelled && setError(err.message));
     return () => {
       cancelled = true;
     };
-  }, [refreshTick]);
+  }, [location?.lat, location?.lon, refreshTick]);
 
   return (
     <section className="card">
       <h2>
-        Mesoscale Discussions <span className="badge">{items ? items.length : 0}</span>
+        Mesoscale Discussions{stateName ? ` — ${stateName}` : ""} <span className="badge">{items ? items.length : 0}</span>
       </h2>
       <div className="cardBody">
         {error && <div className="errorText">{error}</div>}
         {!error && !items && "Loading…"}
-        {items && items.length === 0 && <div className="muted">No active mesoscale discussions.</div>}
+        {items && items.length === 0 && (
+          <div className="muted">No active mesoscale discussions{stateName ? ` for ${stateName}` : ""}.</div>
+        )}
         {items &&
           items.map((it) => (
             <div className="listItem" key={it.link}>

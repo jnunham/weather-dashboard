@@ -15,31 +15,36 @@ import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
 
-export default function SpcWatchesCard({ refreshTick }) {
+export default function SpcWatchesCard({ location, refreshTick }) {
   const [items, setItems] = useState(null);
+  const [stateName, setStateName] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
     api
-      .watches()
-      .then((d) => !cancelled && setItems(d.items))
+      .watches(location?.lat, location?.lon)
+      .then((d) => {
+        if (cancelled) return;
+        setItems(d.items);
+        setStateName(d.filtered_to_state);
+      })
       .catch((err) => !cancelled && setError(err.message));
     return () => {
       cancelled = true;
     };
-  }, [refreshTick]);
+  }, [location?.lat, location?.lon, refreshTick]);
 
   return (
     <section className="card">
       <h2>
-        SPC Watches <span className="badge">{items ? items.length : 0}</span>
+        SPC Watches{stateName ? ` — ${stateName}` : ""} <span className="badge">{items ? items.length : 0}</span>
       </h2>
       <div className="cardBody">
         {error && <div className="errorText">{error}</div>}
         {!error && !items && "Loading…"}
-        {items && items.length === 0 && <div className="muted">No active SPC watches.</div>}
+        {items && items.length === 0 && <div className="muted">No active SPC watches{stateName ? ` for ${stateName}` : ""}.</div>}
         {items &&
           items.map((it) => (
             <div className="listItem" key={it.link}>

@@ -108,8 +108,8 @@ export default function App() {
             onDayChange={setOutlookDay}
             onHazardChange={setOutlookHazard}
           />
-          <MesoscaleDiscussionsCard refreshTick={refreshTick} />
-          <SpcWatchesCard refreshTick={refreshTick} />
+          <MesoscaleDiscussionsCard location={location} refreshTick={refreshTick} />
+          <SpcWatchesCard location={location} refreshTick={refreshTick} />
           <AfdCard location={location} refreshTick={refreshTick} />
         </aside>
       </main>

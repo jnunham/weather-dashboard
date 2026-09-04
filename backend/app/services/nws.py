@@ -53,6 +53,12 @@ def _point_key(lat: float, lon: float) -> str:
     return f"{lat:.4f},{lon:.4f}"
 
 
+async def get_state_abbr(lat: float, lon: float) -> str | None:
+    """Two-letter state/territory abbreviation for a point, e.g. "MI"."""
+    point = await get_point_meta(lat, lon)
+    return (point.get("relativeLocation") or {}).get("properties", {}).get("state")
+
+
 async def get_point_meta(lat: float, lon: float) -> dict:
     """Resolve a lat/lon to forecast office, forecast URLs, and observation stations URL."""
 
@@ -201,7 +207,7 @@ async def get_alerts(lat: float, lon: float) -> dict:
     actually overhead vs. what's still upstream.
     """
     point = await get_point_meta(lat, lon)
-    state = (point.get("relativeLocation") or {}).get("properties", {}).get("state")
+    state = await get_state_abbr(lat, lon)
     county_ugc = point["county"].rstrip("/").split("/")[-1] if point.get("county") else None
 
     async def fetch():

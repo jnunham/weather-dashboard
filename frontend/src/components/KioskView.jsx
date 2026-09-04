@@ -51,6 +51,7 @@ function KioskConditionsScene({ location, refreshTick }) {
   const [alerts, setAlerts] = useState(null);
   const [stateAbbr, setStateAbbr] = useState(null);
   const [spcWatches, setSpcWatches] = useState(null);
+  const [spcWatchesState, setSpcWatchesState] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,8 +86,12 @@ function KioskConditionsScene({ location, refreshTick }) {
       .catch(() => !cancelled && setOutlookCat(null));
 
     api
-      .watches()
-      .then((d) => !cancelled && setSpcWatches(d.items))
+      .watches(location.lat, location.lon)
+      .then((d) => {
+        if (cancelled) return;
+        setSpcWatches(d.items);
+        setSpcWatchesState(d.filtered_to_state);
+      })
       .catch(() => !cancelled && setSpcWatches([]));
 
     return () => {
@@ -194,9 +199,11 @@ function KioskConditionsScene({ location, refreshTick }) {
           </div>
 
           <div className="kioskCompactListBlock">
-            <h3>SPC Watches</h3>
+            <h3>SPC Watches{spcWatchesState ? ` — ${spcWatchesState}` : ""}</h3>
             {spcWatches === null && <div className="kioskLoading">Loading…</div>}
-            {spcWatches && spcWatches.length === 0 && <div className="kioskEmpty">No active SPC watches.</div>}
+            {spcWatches && spcWatches.length === 0 && (
+              <div className="kioskEmpty">No active SPC watches{spcWatchesState ? ` for ${spcWatchesState}` : ""}.</div>
+            )}
             {spcWatches &&
               spcWatches.map((it) => (
                 <div className="kioskCompactCard" key={it.link}>
@@ -213,25 +220,32 @@ function KioskConditionsScene({ location, refreshTick }) {
   );
 }
 
-function KioskMdScene({ refreshTick }) {
+function KioskMdScene({ location, refreshTick }) {
   const [mds, setMds] = useState(null);
+  const [stateName, setStateName] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     api
-      .mesoscaleDiscussions()
-      .then((d) => !cancelled && setMds(d.items))
+      .mesoscaleDiscussions(location.lat, location.lon)
+      .then((d) => {
+        if (cancelled) return;
+        setMds(d.items);
+        setStateName(d.filtered_to_state);
+      })
       .catch(() => !cancelled && setMds([]));
     return () => {
       cancelled = true;
     };
-  }, [refreshTick]);
+  }, [location.lat, location.lon, refreshTick]);
 
   return (
     <div className="kioskScene kioskMdScene">
-      <h2 className="kioskSceneTitle">Mesoscale Discussions</h2>
+      <h2 className="kioskSceneTitle">Mesoscale Discussions{stateName ? ` — ${stateName}` : ""}</h2>
       {mds === null && <div className="kioskLoading">Loading…</div>}
-      {mds && mds.length === 0 && <div className="kioskEmpty">No active mesoscale discussions.</div>}
+      {mds && mds.length === 0 && (
+        <div className="kioskEmpty">No active mesoscale discussions{stateName ? ` for ${stateName}` : ""}.</div>
+      )}
       <div className="kioskMdGrid">
         {mds &&
           mds.map((it) => (
@@ -358,7 +372,7 @@ export default function KioskView({ location }) {
           />
         )}
         {scene === "conditions" && <KioskConditionsScene location={location} refreshTick={refreshTick} />}
-        {scene === "mds" && <KioskMdScene refreshTick={refreshTick} />}
+        {scene === "mds" && <KioskMdScene location={location} refreshTick={refreshTick} />}
         {scene === "afd" && <KioskAfdScene location={location} refreshTick={refreshTick} />}
       </div>
 

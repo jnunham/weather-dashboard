@@ -24,6 +24,7 @@ from fastapi import HTTPException
 
 from ..cache import cached
 from ..config import USER_AGENT
+from .nws import get_state_abbr
 
 SPC_BASE = "https://www.spc.noaa.gov"
 HEADERS = {"User-Agent": USER_AGENT}
@@ -33,6 +34,26 @@ VALID_HAZARDS = {"cat", "torn", "hail", "wind", "prob"}
 
 _IMG_RE = re.compile(r'<img[^>]*src="([^"]+)"', re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]*>")
+
+# The RSS feeds don't carry structured geometry, just free text — MDs and
+# watches reliably spell out full state names in caps ("...SOUTHERN LOWER
+# MICHIGAN...NORTHERN OHIO..."), so matching the state's full name against
+# that text is a simple, honest way to filter to "relevant to here" without
+# pretending to a precision (exact polygon geometry) these feeds don't offer.
+STATE_NAMES = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
+    "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware", "DC": "District of Columbia",
+    "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho", "IL": "Illinois",
+    "IN": "Indiana", "IA": "Iowa", "KS": "Kansas", "KY": "Kentucky", "LA": "Louisiana",
+    "ME": "Maine", "MD": "Maryland", "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota",
+    "MS": "Mississippi", "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
+    "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+    "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma", "OR": "Oregon",
+    "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina", "SD": "South Dakota",
+    "TN": "Tennessee", "TX": "Texas", "UT": "Utah", "VT": "Vermont", "VA": "Virginia",
+    "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming",
+    "PR": "Puerto Rico",
+}
 
 
 async def get_outlook(day: str, hazard: str) -> dict:
@@ -94,15 +115,39 @@ async def _fetch_rss_items(url: str) -> list[dict]:
     return items
 
 
-async def get_mesoscale_discussions() -> dict:
+async def _state_name_for(lat: float | None, lon: float | None) -> str | None:
+    if lat is None or lon is None:
+        return None
+    abbr = await get_state_abbr(lat, lon)
+    return STATE_NAMES.get(abbr) if abbr else None
+
+
+def _mentions_state(item: dict, state_name: str) -> bool:
+    haystack = f"{item['title']} {item['text']}".upper()
+    return state_name.upper() in haystack
+
+
+async def get_mesoscale_discussions(lat: float | None = None, lon: float | None = None) -> dict:
     async def fetch():
         return await _fetch_rss_items(f"{SPC_BASE}/products/spcmdrss.xml")
 
-    return {"items": await cached("spc-mds", 60, fetch)}
+    items = await cached("spc-mds", 60, fetch)
+
+    state_name = await _state_name_for(lat, lon)
+    if state_name:
+        items = [it for it in items if _mentions_state(it, state_name)]
+
+    return {"items": items, "filtered_to_state": state_name}
 
 
-async def get_watches() -> dict:
+async def get_watches(lat: float | None = None, lon: float | None = None) -> dict:
     async def fetch():
         return await _fetch_rss_items(f"{SPC_BASE}/products/spcwwrss.xml")
 
-    return {"items": await cached("spc-watches", 60, fetch)}
+    items = await cached("spc-watches", 60, fetch)
+
+    state_name = await _state_name_for(lat, lon)
+    if state_name:
+        items = [it for it in items if _mentions_state(it, state_name)]
+
+    return {"items": items, "filtered_to_state": state_name}

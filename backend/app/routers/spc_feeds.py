@@ -11,7 +11,9 @@
 # guidance from the National Weather Service and local emergency
 # management, not this app.
 
-from fastapi import APIRouter
+from __future__ import annotations
+
+from fastapi import APIRouter, Query
 
 from ..services import spc
 
@@ -19,10 +21,10 @@ router = APIRouter(prefix="/api", tags=["spc-feeds"])
 
 
 @router.get("/mesoscale-discussions")
-async def mesoscale_discussions():
-    return await spc.get_mesoscale_discussions()
+async def mesoscale_discussions(lat: float | None = Query(None), lon: float | None = Query(None)):
+    return await spc.get_mesoscale_discussions(lat, lon)
 
 
 @router.get("/watches")
-async def watches():
-    return await spc.get_watches()
+async def watches(lat: float | None = Query(None), lon: float | None = Query(None)):
+    return await spc.get_watches(lat, lon)
