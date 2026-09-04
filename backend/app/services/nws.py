@@ -20,6 +20,7 @@ https://www.weather.gov/documentation/services-web-api
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 import httpx
 from fastapi import HTTPException
@@ -31,7 +32,7 @@ NWS_BASE = "https://api.weather.gov"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/geo+json"}
 
 
-async def _get_json(url: str, params: dict | None = None) -> dict:
+async def _get_json(url: str, params: Optional[dict] = None) -> dict:
     """GET JSON from NWS, converting any failure into a clean HTTPException
     instead of letting httpx exceptions escape as raw 500s."""
 
@@ -53,7 +54,7 @@ def _point_key(lat: float, lon: float) -> str:
     return f"{lat:.4f},{lon:.4f}"
 
 
-async def get_state_abbr(lat: float, lon: float) -> str | None:
+async def get_state_abbr(lat: float, lon: float) -> Optional[str]:
     """Two-letter state/territory abbreviation for a point, e.g. "MI"."""
     point = await get_point_meta(lat, lon)
     return (point.get("relativeLocation") or {}).get("properties", {}).get("state")
@@ -190,7 +191,7 @@ async def get_afd(lat: float, lon: float) -> dict:
     }
 
 
-def _extract_key_messages(text: str) -> str | None:
+def _extract_key_messages(text: str) -> Optional[str]:
     """Pull the .KEY MESSAGES... section AFD text usually leads with — not
     every office's template includes one, hence the Optional return."""
     match = re.search(r"\.KEY MESSAGES\.\.\.\s*\n(.*?)\n&&", text, re.IGNORECASE | re.DOTALL)

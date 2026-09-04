@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from typing import Optional
 
 import feedparser
 import httpx
@@ -86,7 +87,7 @@ def _strip_html(html: str) -> str:
     return re.sub(r"\s+", " ", _TAG_RE.sub(" ", html)).strip()
 
 
-def _extract_image(html: str) -> str | None:
+def _extract_image(html: str) -> Optional[str]:
     m = _IMG_RE.search(html)
     return m.group(1) if m else None
 
@@ -116,7 +117,7 @@ async def _fetch_rss_items(url: str) -> list[dict]:
     return items
 
 
-async def _state_name_for(lat: float | None, lon: float | None) -> str | None:
+async def _state_name_for(lat: Optional[float], lon: Optional[float]) -> Optional[str]:
     if lat is None or lon is None:
         return None
     try:
@@ -134,7 +135,7 @@ def _mentions_state(item: dict, state_name: str) -> bool:
     return state_name.upper() in haystack
 
 
-async def get_mesoscale_discussions(lat: float | None = None, lon: float | None = None) -> dict:
+async def get_mesoscale_discussions(lat: Optional[float] = None, lon: Optional[float] = None) -> dict:
     async def fetch():
         return await _fetch_rss_items(f"{SPC_BASE}/products/spcmdrss.xml")
 

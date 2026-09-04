@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Query
 
 from ..services import spc
@@ -21,5 +23,5 @@ router = APIRouter(prefix="/api", tags=["spc-feeds"])
 
 
 @router.get("/mesoscale-discussions")
-async def mesoscale_discussions(lat: float | None = Query(None), lon: float | None = Query(None)):
+async def mesoscale_discussions(lat: Optional[float] = Query(None), lon: Optional[float] = Query(None)):
     return await spc.get_mesoscale_discussions(lat, lon)
