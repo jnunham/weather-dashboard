@@ -11,6 +11,8 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
+import { api } from "./api.js";
+
 export function parseLatLon(str) {
   const m = str.trim().match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
   if (!m) return null;
@@ -101,4 +103,31 @@ export function findOutlookCategory(lat, lon, outlookGeoJson) {
   }
   if (!best) return null;
   return { label: best.properties.LABEL2 || best.properties.LABEL, color: best.properties.fill || "#888" };
+}
+
+// Day 3 only publishes a combined probabilistic-severe layer, not separate
+// tornado/hail/wind — SPC doesn't break those out that far ahead.
+const HAZARDS_BY_DAY = { "1": ["torn", "hail", "wind"], "2": ["torn", "hail", "wind"], "3": ["prob"] };
+
+// The categorical risk (Marginal/Slight/Enhanced/...) plus, for day 1/2,
+// each individual hazard's probability at this point — same point-in-
+// polygon technique as findOutlookCategory, just run once per hazard layer.
+// A null value means the point fell outside every published band for that
+// hazard (i.e. below the lowest threshold SPC maps, not "no data").
+export async function fetchOutlookBreakdown(day, lat, lon) {
+  const hazards = HAZARDS_BY_DAY[day] || [];
+  const [category, ...hazardResults] = await Promise.all([
+    api
+      .outlook(day, "cat")
+      .then((data) => findOutlookCategory(lat, lon, data))
+      .catch(() => null),
+    ...hazards.map((hazard) =>
+      api
+        .outlook(day, hazard)
+        .then((data) => findOutlookCategory(lat, lon, data))
+        .catch(() => null)
+    ),
+  ]);
+  const byHazard = Object.fromEntries(hazards.map((h, i) => [h, hazardResults[i]]));
+  return { category, ...byHazard };
 }

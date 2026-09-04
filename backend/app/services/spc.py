@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 import feedparser
@@ -118,7 +119,13 @@ async def _fetch_rss_items(url: str) -> list[dict]:
 async def _state_name_for(lat: float | None, lon: float | None) -> str | None:
     if lat is None or lon is None:
         return None
-    abbr = await get_state_abbr(lat, lon)
+    try:
+        abbr = await get_state_abbr(lat, lon)
+    except HTTPException:
+        # State filtering is a nice-to-have on top of the feed, not a
+        # requirement — if NWS's point lookup fails for any reason, fall
+        # back to the unfiltered list instead of failing the whole request.
+        return None
     return STATE_NAMES.get(abbr) if abbr else None
 
 
@@ -131,9 +138,14 @@ async def get_mesoscale_discussions(lat: float | None = None, lon: float | None 
     async def fetch():
         return await _fetch_rss_items(f"{SPC_BASE}/products/spcmdrss.xml")
 
-    items = await cached("spc-mds", 60, fetch)
-
-    state_name = await _state_name_for(lat, lon)
+    # Run the RSS fetch and the state lookup concurrently rather than one
+    # after the other — they're independent, and awaiting them in sequence
+    # was needlessly doubling the wait (each can take a few seconds on its
+    # own, which was likely presenting as the scene getting stuck loading).
+    items, state_name = await asyncio.gather(
+        cached("spc-mds", 60, fetch),
+        _state_name_for(lat, lon),
+    )
     if state_name:
         items = [it for it in items if _mentions_state(it, state_name)]
 
@@ -144,9 +156,10 @@ async def get_watches(lat: float | None = None, lon: float | None = None) -> dic
     async def fetch():
         return await _fetch_rss_items(f"{SPC_BASE}/products/spcwwrss.xml")
 
-    items = await cached("spc-watches", 60, fetch)
-
-    state_name = await _state_name_for(lat, lon)
+    items, state_name = await asyncio.gather(
+        cached("spc-watches", 60, fetch),
+        _state_name_for(lat, lon),
+    )
     if state_name:
         items = [it for it in items if _mentions_state(it, state_name)]
 

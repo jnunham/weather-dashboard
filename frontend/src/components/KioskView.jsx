@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { alertClass, findOutlookCategory, fmt, topAlert } from "../utils.js";
+import { alertClass, fetchOutlookBreakdown, fmt, topAlert } from "../utils.js";
 import MapView from "./MapView.jsx";
 
 const ALL_SCENES = ["map", "conditions", "mds", "afd"];
@@ -47,7 +47,7 @@ function KioskConditionsScene({ location, refreshTick }) {
   const [periods, setPeriods] = useState(null);
   const [error, setError] = useState(null);
   const [topAlertItem, setTopAlertItem] = useState(undefined); // undefined = loading, null = none
-  const [outlookCat, setOutlookCat] = useState(undefined);
+  const [outlook, setOutlook] = useState(undefined);
   const [alerts, setAlerts] = useState(null);
   const [stateAbbr, setStateAbbr] = useState(null);
   const [spcWatches, setSpcWatches] = useState(null);
@@ -80,10 +80,7 @@ function KioskConditionsScene({ location, refreshTick }) {
         setTopAlertItem(null);
       });
 
-    api
-      .outlook("1", "cat")
-      .then((d) => !cancelled && setOutlookCat(findOutlookCategory(location.lat, location.lon, d)))
-      .catch(() => !cancelled && setOutlookCat(null));
+    fetchOutlookBreakdown("1", location.lat, location.lon).then((d) => !cancelled && setOutlook(d));
 
     api
       .watches(location.lat, location.lon)
@@ -151,17 +148,25 @@ function KioskConditionsScene({ location, refreshTick }) {
               )}
             </div>
             <div className="kioskGlanceOutlook">
-              <div className="kioskGlanceOutlookLabel">Today's Outlook</div>
-              {outlookCat === undefined && <div className="kioskLoading">Loading…</div>}
-              {outlookCat === null && (
-                <span className="kioskOutlookChip" style={{ background: "#888" }}>
-                  None
-                </span>
-              )}
-              {outlookCat && (
-                <span className="kioskOutlookChip" style={{ background: outlookCat.color }}>
-                  {outlookCat.label}
-                </span>
+              <div className="kioskGlanceOutlookLabel">Today's Severe Weather Outlook</div>
+              {outlook === undefined && <div className="kioskLoading">Loading…</div>}
+              {outlook && (
+                <>
+                  <span className="kioskOutlookChip" style={{ background: outlook.category?.color || "#888" }}>
+                    {outlook.category?.label || "None"}
+                  </span>
+                  <div className="kioskHazardRow">
+                    <span className="kioskHazardChip" style={outlook.torn ? { background: outlook.torn.color } : undefined}>
+                      {outlook.torn ? outlook.torn.label : "No Tornado Risk"}
+                    </span>
+                    <span className="kioskHazardChip" style={outlook.hail ? { background: outlook.hail.color } : undefined}>
+                      {outlook.hail ? outlook.hail.label : "No Hail Risk"}
+                    </span>
+                    <span className="kioskHazardChip" style={outlook.wind ? { background: outlook.wind.color } : undefined}>
+                      {outlook.wind ? outlook.wind.label : "No Wind Risk"}
+                    </span>
+                  </div>
+                </>
               )}
             </div>
           </div>

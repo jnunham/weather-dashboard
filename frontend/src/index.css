@@ -217,6 +217,12 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .outlookLegend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
 .outlookLegend span { padding: 2px 6px; border-radius: 4px; color: #06111f; font-weight: 600; }
 
+.outlookBreakdown { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.outlookBreakdownLabel { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.outlookBreakdownChips { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
+.outlookBreakdownChips span { padding: 3px 8px; border-radius: 4px; color: #06111f; font-weight: 600; background: var(--border); }
+.outlookBreakdownChips span.noRisk { color: var(--muted); }
+
 .afdText {
   white-space: pre-wrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -451,7 +457,20 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .kioskGlanceAlertEvent { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 
 .kioskGlanceOutlookLabel { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
-.kioskGlanceOutlook .kioskOutlookChip { font-size: 18px; padding: 10px 20px; align-self: flex-start; }
+.kioskGlanceOutlook .kioskOutlookChip { font-size: 18px; padding: 10px 20px; align-self: flex-start; margin-bottom: 14px; }
+
+.kioskHazardRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.kioskHazardChip {
+  background: var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+/* A hazard chip with an inline background color (an actual risk %) always
+   uses dark text to stay legible against SPC's light fill colors. */
+.kioskHazardChip[style] { color: #06111f; }
 
 .kioskForecastRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .kioskForecastCard {
@@ -539,8 +558,16 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .severeModePanels {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  /* Without an explicit row track, a CSS grid's row height defaults to its
+     content's size, not the container's — since the map panels start empty
+     (no intrinsic height), the row collapsed toward 0px, so Leaflet
+     initialized into a zero-size container and rendered nothing at all
+     (not even the offline state outline, which has no network dependency
+     to blame). This is what actually makes the row fill the space. */
+  grid-template-rows: 1fr;
   gap: 1px;
   background: var(--border);
 }
