@@ -24,6 +24,7 @@ Pass --setup-only to install everything without starting the servers.
 """
 
 import argparse
+import os
 import platform
 import shutil
 import socket
@@ -188,7 +189,16 @@ def run_dev_servers():
 
 def build_frontend():
     print("\n=== Building frontend ===")
-    run([shutil.which("npm"), "run", "build"], cwd=FRONTEND)
+    # Vite bakes VITE_-prefixed env vars into the build at *build time* — if
+    # frontend/.env has a leftover VITE_API_BASE_URL from before --lan mode
+    # existed (e.g. a hardcoded "http://localhost:8000"), it would silently
+    # override the app's own same-origin default and get compiled into the
+    # bundle permanently, sending every device's requests to the wrong host.
+    # Force it blank for this build specifically so --lan always gets the
+    # correct same-origin behavior regardless of what's sitting in .env.
+    env = {**os.environ, "VITE_API_BASE_URL": ""}
+    print("$ npm run build   (VITE_API_BASE_URL forced blank for this build)")
+    subprocess.run([shutil.which("npm"), "run", "build"], cwd=FRONTEND, check=True, env=env)
 
 
 def run_combined_server(port):
