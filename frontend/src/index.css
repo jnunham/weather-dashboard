@@ -184,6 +184,8 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 
 .tempRow { font-size: 28px; font-weight: 700; }
 .condRow { color: var(--muted); margin-bottom: 6px; }
+.obsRow { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+.staleBadge { color: var(--warn); font-weight: 600; }
 .metaGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 6px; }
 .metaGrid div span { color: var(--muted); }
 
@@ -214,6 +216,8 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 }
 .btnRow button.active { background: var(--accent); color: #06111f; border-color: var(--accent); font-weight: 600; }
 
+.helpText { color: var(--muted); font-size: 11px; line-height: 1.4; margin-bottom: 8px; }
+
 .outlookLegend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
 .outlookLegend span { padding: 2px 6px; border-radius: 4px; color: #06111f; font-weight: 600; }
 
@@ -222,6 +226,33 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .outlookBreakdownChips { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
 .outlookBreakdownChips span { padding: 3px 8px; border-radius: 4px; color: #06111f; font-weight: 600; background: var(--border); }
 .outlookBreakdownChips span.noRisk { color: var(--muted); }
+
+.experimentalBadge {
+  background: #9b7cff;
+  color: #06111f;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.niceDayList { display: flex; flex-direction: column; }
+.niceDayRow {
+  display: grid;
+  grid-template-columns: 32px 56px 36px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.niceDayRow:last-child { border-bottom: none; }
+.niceDayDay { font-weight: 600; }
+.niceDayLabel { padding: 2px 6px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #06111f; text-align: center; }
+.niceDayTemp { color: var(--accent); font-weight: 600; }
+.niceDayNote { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .afdText {
   white-space: pre-wrap;

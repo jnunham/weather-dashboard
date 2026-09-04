@@ -67,6 +67,10 @@ export const api = {
   // sent as the literal string "undefined".
   mesoscaleDiscussions: (lat, lon) => getJson("/api/mesoscale-discussions", lat != null && lon != null ? { lat, lon } : {}),
   geocode: (q) => getJson("/api/geocode", { q }),
+  // "Experimental" products: this app's own heuristic scores over raw
+  // forecast-model fields, not an official NWS/SPC product — see
+  // backend/app/services/experimental.py for the formula.
+  niceDayForecast: (lat, lon) => getJson("/api/experimental/nice-day", { lat, lon }),
 };
 
 // Radar frames (and the tile images themselves, see MapView) are proxied

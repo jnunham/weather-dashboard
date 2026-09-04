@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { fmt } from "../utils.js";
+import { fmt, minutesSince } from "../utils.js";
 
 export default function CurrentConditionsCard({ location, refreshTick }) {
   const [data, setData] = useState(null);
@@ -45,6 +45,20 @@ export default function CurrentConditionsCard({ location, refreshTick }) {
             <div className="condRow">
               {data.text_description || ""} &middot; {data.station_name}
             </div>
+            {(() => {
+              const minutesAgo = minutesSince(data.observed_at);
+              if (minutesAgo === null) return null;
+              const label = minutesAgo < 1 ? "just now" : minutesAgo < 60 ? `${minutesAgo} min ago` : `${Math.round(minutesAgo / 60)} hr ago`;
+              // This station's own report age, not this app's refresh cycle — a
+              // number here that stops changing means the source station
+              // stopped reporting, not that the dashboard stopped polling it.
+              return (
+                <div className="obsRow">
+                  Observed {label}
+                  {minutesAgo > 90 && <span className="staleBadge"> — this station may be delayed</span>}
+                </div>
+              );
+            })()}
             <div className="metaGrid">
               <div>
                 <span>Feels like</span> {fmt(data.feels_like_f)}°F

@@ -19,8 +19,10 @@ import CurrentConditionsCard from "./components/CurrentConditionsCard.jsx";
 import ForecastCard from "./components/ForecastCard.jsx";
 import KioskView from "./components/KioskView.jsx";
 import LocationPrompt from "./components/LocationPrompt.jsx";
+import LocationRiskCard from "./components/LocationRiskCard.jsx";
 import MapView from "./components/MapView.jsx";
 import MesoscaleDiscussionsCard from "./components/MesoscaleDiscussionsCard.jsx";
+import NiceDayCard from "./components/NiceDayCard.jsx";
 import OutlookCard from "./components/OutlookCard.jsx";
 import Ticker from "./components/Ticker.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -93,10 +95,10 @@ export default function App() {
         />
         <aside className="panel">
           <CurrentConditionsCard location={location} refreshTick={refreshTick} />
+          <LocationRiskCard location={location} day={outlookDay} />
           <ForecastCard location={location} refreshTick={refreshTick} />
           <AlertsCard location={location} refreshTick={refreshTick} />
           <OutlookCard
-            location={location}
             day={outlookDay}
             hazard={outlookHazard}
             onDayChange={setOutlookDay}
@@ -104,6 +106,7 @@ export default function App() {
           />
           <MesoscaleDiscussionsCard location={location} refreshTick={refreshTick} />
           <AfdCard location={location} refreshTick={refreshTick} />
+          <NiceDayCard location={location} />
         </aside>
       </main>
     </div>

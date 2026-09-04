@@ -14,7 +14,6 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { fetchOutlookBreakdown } from "../utils.js";
 
 const HAZARDS_BY_DAY = {
   1: [
@@ -35,10 +34,9 @@ const HAZARDS_BY_DAY = {
   ],
 };
 
-export default function OutlookCard({ location, day, hazard, onDayChange, onHazardChange }) {
+export default function OutlookCard({ day, hazard, onDayChange, onHazardChange }) {
   const [legend, setLegend] = useState([]);
   const [error, setError] = useState(null);
-  const [breakdown, setBreakdown] = useState(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,16 +58,6 @@ export default function OutlookCard({ location, day, hazard, onDayChange, onHaza
     };
   }, [day, hazard]);
 
-  useEffect(() => {
-    if (!location) return undefined;
-    let cancelled = false;
-    setBreakdown(undefined);
-    fetchOutlookBreakdown(String(day), location.lat, location.lon).then((d) => !cancelled && setBreakdown(d));
-    return () => {
-      cancelled = true;
-    };
-  }, [day, location?.lat, location?.lon]);
-
   function handleDayChange(newDay) {
     onDayChange(newDay);
     const hazards = HAZARDS_BY_DAY[newDay];
@@ -82,6 +70,11 @@ export default function OutlookCard({ location, day, hazard, onDayChange, onHaza
     <section className="card">
       <h2>SPC Severe Weather Outlook</h2>
       <div className="cardBody">
+        <div className="helpText">
+          The Storm Prediction Center's outlook map for organized severe thunderstorms. Categories run low to high:
+          Marginal, Slight, Enhanced, Moderate, High. "Categorical" is the overall category; the other tabs break out
+          the odds of a specific hazard (tornado, hail, wind) within 25 miles of any point in the shaded area.
+        </div>
         <div className="btnRow">
           {[1, 2, 3].map((d) => (
             <button key={d} className={String(d) === String(day) ? "active" : ""} onClick={() => handleDayChange(d)}>
@@ -108,25 +101,6 @@ export default function OutlookCard({ location, day, hazard, onDayChange, onHaza
             </span>
           ))}
         </div>
-
-        {location && (
-          <div className="outlookBreakdown">
-            <div className="outlookBreakdownLabel">At your location</div>
-            {breakdown === undefined && <div className="muted">Loading…</div>}
-            {breakdown && (
-              <div className="outlookBreakdownChips">
-                <span style={{ background: breakdown.category?.color || "#888" }}>{breakdown.category?.label || "None"}</span>
-                {["torn", "hail", "wind", "prob"]
-                  .filter((h) => h in breakdown)
-                  .map((h) => (
-                    <span key={h} className={breakdown[h] ? "" : "noRisk"} style={breakdown[h] ? { background: breakdown[h].color } : undefined}>
-                      {breakdown[h] ? breakdown[h].label : `No ${h === "prob" ? "Severe" : h[0].toUpperCase() + h.slice(1)} Risk`}
-                    </span>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </section>
   );

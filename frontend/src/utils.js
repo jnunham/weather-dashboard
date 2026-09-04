@@ -23,6 +23,14 @@ export function fmt(n, digits = 0) {
   return n === null || n === undefined || Number.isNaN(n) ? "—" : n.toFixed(digits);
 }
 
+// Minutes between now and an ISO timestamp — lets the UI show "how old is
+// this observation" instead of a bare number with no way to tell a live
+// reading from one the source station stopped updating hours ago.
+export function minutesSince(isoString) {
+  if (!isoString) return null;
+  return Math.round((Date.now() - new Date(isoString).getTime()) / 60000);
+}
+
 export function alertClass(event) {
   if (/warning/i.test(event)) return "severe";
   if (/watch/i.test(event)) return "watch";
