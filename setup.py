@@ -146,25 +146,36 @@ def setup_frontend():
     return True
 
 
-def run_dev_servers():
+def run_dev_servers(lan=False):
     print("\n=== Starting servers ===")
-    # --host 0.0.0.0 on both: bind every interface, not just loopback, so
-    # other devices on the LAN (another computer, a phone) can reach them —
-    # not just this machine.
+    # Localhost-only unless --lan is passed. Binding to 0.0.0.0 by default
+    # was a mistake: on Windows, a process listening on all interfaces for
+    # the first time commonly triggers a Windows Defender Firewall prompt —
+    # if that's missed or not clicked "Allow", the server *looks* started
+    # but nothing can actually reach it. Making LAN access opt-in means the
+    # plain `python3 setup.py` path stays exactly as reliable as it was
+    # before this existed.
+    host = "0.0.0.0" if lan else "127.0.0.1"
     backend_proc = subprocess.Popen(
         [
             str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
-            "--reload", "--app-dir", str(BACKEND), "--host", "0.0.0.0", "--port", "8000",
+            "--reload", "--app-dir", str(BACKEND), "--host", host, "--port", "8000",
         ],
         cwd=ROOT,
     )
-    frontend_proc = subprocess.Popen([shutil.which("npm"), "run", "dev", "--", "--host", "0.0.0.0"], cwd=FRONTEND)
+    frontend_cmd = [shutil.which("npm"), "run", "dev"]
+    if lan:
+        frontend_cmd += ["--", "--host", "0.0.0.0"]
+    frontend_proc = subprocess.Popen(frontend_cmd, cwd=FRONTEND)
 
     print(f"\nBackend:  {BACKEND_URL}")
     print(f"Frontend: {FRONTEND_URL}")
-    lan_ip = get_lan_ip()
-    if lan_ip:
-        print(f"\nFrom another device on your network: http://{lan_ip}:5173")
+    if lan:
+        lan_ip = get_lan_ip()
+        if lan_ip:
+            print(f"\nFrom another device on your network: http://{lan_ip}:5173")
+    else:
+        print("\n(Localhost only. Re-run with --lan to make this reachable from other devices on your network.)")
     print("\nPress Ctrl+C to stop both.\n")
 
     time.sleep(2)
@@ -192,6 +203,9 @@ def run_dev_servers():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--setup-only", action="store_true", help="install everything but don't start the servers")
+    parser.add_argument(
+        "--lan", action="store_true", help="bind both servers to all network interfaces, reachable from other devices on your LAN"
+    )
     args = parser.parse_args()
 
     setup_backend()
@@ -205,7 +219,7 @@ def main():
         print("\nBackend is set up, but the frontend can't start without Node.js. Install it, then re-run this script.")
         sys.exit(1)
 
-    run_dev_servers()
+    run_dev_servers(lan=args.lan)
 
 
 if __name__ == "__main__":
