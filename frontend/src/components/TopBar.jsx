@@ -70,9 +70,6 @@ export default function TopBar({ location, onLocationChange, lastUpdated }) {
         </button>
       </form>
       <div className="locationLabel">{status || location.label}</div>
-      <a className="iconButton kioskLink" href="?severe=1" title="Severe weather mode — tight-zoom animated reflectivity/velocity panels">
-        ⛈️ Severe
-      </a>
       <a className="iconButton kioskLink" href="?kiosk=1" title="Kiosk mode — full-screen, auto-rotating display">
         🖥️ Kiosk
       </a>

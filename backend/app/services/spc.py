@@ -150,17 +150,3 @@ async def get_mesoscale_discussions(lat: float | None = None, lon: float | None 
         items = [it for it in items if _mentions_state(it, state_name)]
 
     return {"items": items, "filtered_to_state": state_name}
-
-
-async def get_watches(lat: float | None = None, lon: float | None = None) -> dict:
-    async def fetch():
-        return await _fetch_rss_items(f"{SPC_BASE}/products/spcwwrss.xml")
-
-    items, state_name = await asyncio.gather(
-        cached("spc-watches", 60, fetch),
-        _state_name_for(lat, lon),
-    )
-    if state_name:
-        items = [it for it in items if _mentions_state(it, state_name)]
-
-    return {"items": items, "filtered_to_state": state_name}

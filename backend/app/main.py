@@ -14,14 +14,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import CORS_ORIGINS, DEFAULT_LOCATION
-from .routers import alerts, geocode, nws_point, outlook, radar, radar_products, spc_feeds
+from .config import CORS_ORIGIN_REGEX, CORS_ORIGINS, DEFAULT_LOCATION
+from .routers import alerts, geocode, nws_point, outlook, radar, spc_feeds
 
 app = FastAPI(title="Weather Dashboard API")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
@@ -32,7 +33,6 @@ app.include_router(outlook.router)
 app.include_router(spc_feeds.router)
 app.include_router(geocode.router)
 app.include_router(radar.router)
-app.include_router(radar_products.router)
 
 
 @app.get("/api/health")

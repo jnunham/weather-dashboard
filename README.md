@@ -2,9 +2,7 @@
 
 A self-hosted weather dashboard: live radar, current conditions and forecast,
 NWS watches/warnings, SPC convective outlooks and mesoscale discussions,
-county boundaries, a kiosk mode for a spare monitor, and a tight-zoom
-"severe weather mode" with animated single-site NEXRAD reflectivity and
-velocity.
+county boundaries, and a kiosk mode for a spare monitor.
 
 This was vibe coded by a weather enthusiast, with a lot of back-and-forth
 against real weather APIs to get the data actually right — it's a hobby
@@ -32,15 +30,18 @@ safety.
   spare monitor: map, current conditions + alerts, mesoscale discussions,
   and the local forecast discussion's key messages. Scenes and timing are
   configurable via `?scenes=map,conditions&duration=15`.
-- **Severe weather mode** (`?severe=1`) — tight-zoom, animated single-site
-  NEXRAD reflectivity and velocity for your nearest radar site, plus a list
-  of warnings covering your area and immediate surroundings
+- **Mobile-friendly** — the normal dashboard reflows into a single-column,
+  touch-friendly layout on any phone-width screen automatically (no app to
+  install, no separate URL — just open it on the phone's browser).
+- **LAN-reachable** — both dev servers bind all network interfaces, so any
+  device on your home network can load it, not just the machine it's
+  running on.
 
 ## Architecture
 
 - `backend/` — FastAPI (Python). Proxies and lightly caches NWS, SPC,
-  RainViewer, NOAA's radar GeoServer, and Open-Meteo's geocoder, so the
-  frontend never talks to third parties directly.
+  RainViewer, and Open-Meteo's geocoder, so the frontend never talks to
+  third parties directly.
 - `frontend/` — React (Vite) + Leaflet.
 
 ## Setup
@@ -54,7 +55,13 @@ Node.js automatically if it's missing, npm-installs the frontend, and then
 starts both dev servers. Pass `--setup-only` to install without starting
 anything.
 
-Open `http://localhost:5173`.
+Open `http://localhost:5173`. The script also prints a `http://<your-LAN-IP>:5173`
+address — open that from any other device on the same network (another
+computer, a phone) to reach it there too.
+
+If you already ran setup before this LAN-access change: delete
+`frontend/.env` (it has an old hardcoded `VITE_API_BASE_URL` that only works
+from this machine) and re-run `python3 setup.py` to regenerate it.
 
 ### Configuration
 
@@ -65,10 +72,9 @@ SPC ask for a real contact string there.
 
 ## Data sources
 
-- [National Weather Service API](https://www.weather.gov/documentation/services-web-api) — conditions, forecast, alerts, forecast discussions
-- [Storm Prediction Center](https://www.spc.noaa.gov/) — convective outlooks, mesoscale discussions, watches
+- [National Weather Service API](https://www.weather.gov/documentation/services-web-api) — conditions, forecast, alerts (including Tornado/Severe Thunderstorm Watches), forecast discussions
+- [Storm Prediction Center](https://www.spc.noaa.gov/) — convective outlooks, mesoscale discussions
 - [RainViewer](https://www.rainviewer.com/) — composite radar mosaic
-- [NOAA GeoServer](https://opengeo.ncep.noaa.gov/geoserver/) — single-site NEXRAD Level 3 reflectivity/velocity
 - [Open-Meteo](https://open-meteo.com/) — geocoding
 - County/state boundaries: US Census Bureau cartographic boundary files; PublicaMundi's public-domain state boundary GeoJSON
 

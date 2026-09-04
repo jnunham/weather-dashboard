@@ -23,8 +23,3 @@ router = APIRouter(prefix="/api", tags=["spc-feeds"])
 @router.get("/mesoscale-discussions")
 async def mesoscale_discussions(lat: float | None = Query(None), lon: float | None = Query(None)):
     return await spc.get_mesoscale_discussions(lat, lon)
-
-
-@router.get("/watches")
-async def watches(lat: float | None = Query(None), lon: float | None = Query(None)):
-    return await spc.get_watches(lat, lon)

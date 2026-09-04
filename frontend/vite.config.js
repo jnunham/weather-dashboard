@@ -18,5 +18,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // Bind all interfaces, not just localhost, so other devices on the LAN
+    // (another computer, a phone) can load the dev server too.
+    host: true,
   },
 });

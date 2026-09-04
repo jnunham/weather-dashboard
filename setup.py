@@ -26,6 +26,7 @@ Pass --setup-only to install everything without starting the servers.
 import argparse
 import platform
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -43,6 +44,18 @@ VENV_PYTHON = VENV_DIR / ("Scripts/python.exe" if IS_WINDOWS else "bin/python")
 
 BACKEND_URL = "http://localhost:8000"
 FRONTEND_URL = "http://localhost:5173"
+
+
+def get_lan_ip():
+    """Best-effort LAN IP for printing a URL other devices can actually use.
+    Opens no real connection — UDP has no handshake, so connect() here just
+    asks the OS which local interface/IP would be used to reach that address."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return None
 
 
 def run(cmd, cwd=None):
@@ -135,15 +148,24 @@ def setup_frontend():
 
 def run_dev_servers():
     print("\n=== Starting servers ===")
+    # --host 0.0.0.0 on both: bind every interface, not just loopback, so
+    # other devices on the LAN (another computer, a phone) can reach them —
+    # not just this machine.
     backend_proc = subprocess.Popen(
-        [str(VENV_PYTHON), "-m", "uvicorn", "app.main:app", "--reload", "--app-dir", str(BACKEND), "--port", "8000"],
+        [
+            str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
+            "--reload", "--app-dir", str(BACKEND), "--host", "0.0.0.0", "--port", "8000",
+        ],
         cwd=ROOT,
     )
-    frontend_proc = subprocess.Popen([shutil.which("npm"), "run", "dev"], cwd=FRONTEND)
+    frontend_proc = subprocess.Popen([shutil.which("npm"), "run", "dev", "--", "--host", "0.0.0.0"], cwd=FRONTEND)
 
     print(f"\nBackend:  {BACKEND_URL}")
     print(f"Frontend: {FRONTEND_URL}")
-    print("Press Ctrl+C to stop both.\n")
+    lan_ip = get_lan_ip()
+    if lan_ip:
+        print(f"\nFrom another device on your network: http://{lan_ip}:5173")
+    print("\nPress Ctrl+C to stop both.\n")
 
     time.sleep(2)
     try:

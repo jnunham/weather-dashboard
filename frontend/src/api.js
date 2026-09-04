@@ -11,17 +11,41 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+// Same host the page itself was loaded from, backend's port. This makes the
+// app work correctly no matter which device loads the frontend — this
+// machine, or another one on the LAN — since a hardcoded "localhost" would
+// silently point every *other* device's requests back at itself instead of
+// the actual server. Override via VITE_API_BASE_URL only for unusual setups
+// (backend on a different host/port than the frontend).
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+
+// Backend calls out to NWS/SPC with their own ~15s timeouts, so a genuinely
+// slow-but-working request can take a while — but a request that hangs
+// outright (network stall, dropped connection) previously left the UI on
+// "Loading…" forever with no way out. This bounds every call to a fixed
+// worst case: 16s (just past the backend's own timeout) and then a clear
+// error instead of an indefinite spinner.
+const REQUEST_TIMEOUT_MS = 16000;
 
 async function getJson(path, params = {}) {
   const url = new URL(API_BASE + path, window.location.origin);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `${res.status} ${res.statusText}`);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || `${res.status} ${res.statusText}`);
+    }
+    return await res.json();
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Request timed out — the server took too long to respond.");
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 export const api = {
@@ -36,9 +60,7 @@ export const api = {
   // entirely rather than passing lat=undefined, which would otherwise be
   // sent as the literal string "undefined".
   mesoscaleDiscussions: (lat, lon) => getJson("/api/mesoscale-discussions", lat != null && lon != null ? { lat, lon } : {}),
-  watches: (lat, lon) => getJson("/api/watches", lat != null && lon != null ? { lat, lon } : {}),
   geocode: (q) => getJson("/api/geocode", { q }),
-  radarSite: (lat, lon) => getJson("/api/radar-products/site", { lat, lon }),
 };
 
 // Radar frames (and the tile images themselves, see MapView) are proxied

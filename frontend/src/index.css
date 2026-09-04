@@ -549,57 +549,39 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .kioskDot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
 .kioskDot.active { background: var(--accent); }
 
-/* ---------- Severe weather mode ---------- */
+/* ---------- Mobile layout ---------- */
+/* A phone-width viewport, not a specific device's user-agent string, is
+   what actually determines whether the side-by-side map+panel layout fits —
+   this covers any narrow screen (phone, small tablet, a resized desktop
+   window) without needing to keep a UA-sniffing list current as new devices
+   ship. The normal (kiosk/severe-mode-free) dashboard is the only view this
+   touches; kiosk mode is for a dedicated wall display, not a phone. */
+@media (max-width: 860px) {
+  .app { height: auto; min-height: 100%; }
 
-.severeMode { display: flex; flex-direction: column; height: 100%; background: var(--bg); cursor: none; zoom: 1.3; }
+  .topbar { padding: 8px 12px; gap: 10px; }
+  .topbar h1 { font-size: 15px; }
+  .locationForm input { width: 130px; }
+  .lastUpdated { display: none; }
+  /* Kiosk mode is for a dedicated wall display, not useful on a phone. */
+  .kioskLink { display: none; }
 
-.severeModeBody { flex: 1 1 auto; min-height: 0; display: flex; gap: 1px; background: var(--border); }
+  main.layout { flex-direction: column; height: auto; min-height: 0; }
 
-.severeModePanels {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  /* Without an explicit row track, a CSS grid's row height defaults to its
-     content's size, not the container's — since the map panels start empty
-     (no intrinsic height), the row collapsed toward 0px, so Leaflet
-     initialized into a zero-size container and rendered nothing at all
-     (not even the offline state outline, which has no network dependency
-     to blame). This is what actually makes the row fill the space. */
-  grid-template-rows: 1fr;
-  gap: 1px;
-  background: var(--border);
+  .mapColumn { flex: 0 0 auto; height: 42vh; min-height: 260px; }
+  #map { min-height: 0; }
+
+  /* Two rows instead of one: the slider needs its own full-width row on a
+     narrow screen, or it and the toggle labels crush each other unreadably. */
+  .radarControls { flex-wrap: wrap; height: auto; padding: 8px 12px; row-gap: 8px; }
+  .radarControls input[type="range"] { order: 1; flex-basis: 100%; }
+  .radarTime { font-size: 11px; width: auto; }
+  .toggle { font-size: 11px; }
+
+  .panel { width: 100%; flex: 0 0 auto; overflow-y: visible; }
+
+  /* Bigger tap targets throughout — desktop's compact buttons/inputs are
+     hard to hit accurately with a finger. */
+  .locationForm button, .iconButton, .btnRow button { min-height: 40px; }
+  .card h2 { font-size: 14px; }
 }
-
-.severeModePanel {
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-
-.severeModePanelTitle {
-  padding: 10px 16px;
-  font-size: 18px;
-  font-weight: 700;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.radarProductMap { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; }
-
-.severeModeTicker {
-  width: 380px;
-  flex: 0 0 auto;
-  background: var(--panel-bg);
-  padding: 16px;
-  overflow-y: auto;
-}
-
-.severeModeTicker .kioskAlertCard { margin-bottom: 14px; }
-.severeModeTicker .kioskSceneTitle { font-size: 20px; margin-bottom: 16px; }

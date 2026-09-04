@@ -22,14 +22,11 @@ import LocationPrompt from "./components/LocationPrompt.jsx";
 import MapView from "./components/MapView.jsx";
 import MesoscaleDiscussionsCard from "./components/MesoscaleDiscussionsCard.jsx";
 import OutlookCard from "./components/OutlookCard.jsx";
-import SevereWeatherMode from "./components/SevereWeatherMode.jsx";
-import SpcWatchesCard from "./components/SpcWatchesCard.jsx";
 import Ticker from "./components/Ticker.jsx";
 import TopBar from "./components/TopBar.jsx";
 
 const urlParams = new URLSearchParams(window.location.search);
 const isKiosk = urlParams.get("kiosk") === "1";
-const isSevereMode = urlParams.get("severe") === "1";
 
 const STORAGE_KEY = "wx_dashboard_location";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -78,10 +75,6 @@ export default function App() {
     return <LocationPrompt onConfirm={handleLocationChange} />;
   }
 
-  if (isSevereMode) {
-    return <SevereWeatherMode location={location} />;
-  }
-
   if (isKiosk) {
     return <KioskView location={location} />;
   }
@@ -110,7 +103,6 @@ export default function App() {
             onHazardChange={setOutlookHazard}
           />
           <MesoscaleDiscussionsCard location={location} refreshTick={refreshTick} />
-          <SpcWatchesCard location={location} refreshTick={refreshTick} />
           <AfdCard location={location} refreshTick={refreshTick} />
         </aside>
       </main>

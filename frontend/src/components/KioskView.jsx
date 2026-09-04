@@ -39,9 +39,12 @@ function readKioskConfig() {
 }
 
 // Everything about "right now": conditions, forecast, the single
-// most-urgent alert + today's outlook category at a glance, the full
-// watches/warnings list, and active SPC watches — one consolidated scene
-// instead of four thin ones.
+// most-urgent alert + today's outlook category at a glance, and the full
+// watches/warnings list — one consolidated scene instead of several thin
+// ones. (There's no separate "SPC Watches" list here: SPC-issued
+// Tornado/Severe Thunderstorm Watches are distributed through the normal
+// NWS alert feed too, so they already show up in Watches & Warnings below —
+// a second list of the same watches added nothing but confusion.)
 function KioskConditionsScene({ location, refreshTick }) {
   const [conditions, setConditions] = useState(null);
   const [periods, setPeriods] = useState(null);
@@ -50,8 +53,6 @@ function KioskConditionsScene({ location, refreshTick }) {
   const [outlook, setOutlook] = useState(undefined);
   const [alerts, setAlerts] = useState(null);
   const [stateAbbr, setStateAbbr] = useState(null);
-  const [spcWatches, setSpcWatches] = useState(null);
-  const [spcWatchesState, setSpcWatchesState] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,15 +82,6 @@ function KioskConditionsScene({ location, refreshTick }) {
       });
 
     fetchOutlookBreakdown("1", location.lat, location.lon).then((d) => !cancelled && setOutlook(d));
-
-    api
-      .watches(location.lat, location.lon)
-      .then((d) => {
-        if (cancelled) return;
-        setSpcWatches(d.items);
-        setSpcWatchesState(d.filtered_to_state);
-      })
-      .catch(() => !cancelled && setSpcWatches([]));
 
     return () => {
       cancelled = true;
@@ -199,23 +191,6 @@ function KioskConditionsScene({ location, refreshTick }) {
                     {a.is_local && <span className="badge localBadge">LOCAL</span>}
                   </div>
                   <div className="kioskCompactSub">{a.area_desc}</div>
-                </div>
-              ))}
-          </div>
-
-          <div className="kioskCompactListBlock">
-            <h3>SPC Watches{spcWatchesState ? ` — ${spcWatchesState}` : ""}</h3>
-            {spcWatches === null && <div className="kioskLoading">Loading…</div>}
-            {spcWatches && spcWatches.length === 0 && (
-              <div className="kioskEmpty">No active SPC watches{spcWatchesState ? ` for ${spcWatchesState}` : ""}.</div>
-            )}
-            {spcWatches &&
-              spcWatches.map((it) => (
-                <div className="kioskCompactCard" key={it.link}>
-                  <div className="kioskCompactHeader">
-                    <span>{it.title}</span>
-                  </div>
-                  <div className="kioskCompactSub">{it.text}</div>
                 </div>
               ))}
           </div>
