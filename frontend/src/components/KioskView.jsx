@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { alertClass, fetchOutlookBreakdown, fmt, topAlert } from "../utils.js";
+import { alertClass, fetchOutlookBreakdown, fmt, NICE_DAY_COLORS, topAlert } from "../utils.js";
 import MapView from "./MapView.jsx";
 
 const ALL_SCENES = ["map", "conditions", "mds", "afd"];
@@ -53,6 +53,7 @@ function KioskConditionsScene({ location, refreshTick }) {
   const [outlook, setOutlook] = useState(undefined);
   const [alerts, setAlerts] = useState(null);
   const [stateAbbr, setStateAbbr] = useState(null);
+  const [niceDay, setNiceDay] = useState(undefined); // undefined = loading, null = unavailable
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +83,11 @@ function KioskConditionsScene({ location, refreshTick }) {
       });
 
     fetchOutlookBreakdown("1", location.lat, location.lon).then((d) => !cancelled && setOutlook(d));
+
+    api
+      .niceDayForecast(location.lat, location.lon)
+      .then((d) => !cancelled && setNiceDay(d.days?.[0] || null))
+      .catch(() => !cancelled && setNiceDay(null));
 
     return () => {
       cancelled = true;
@@ -157,6 +163,23 @@ function KioskConditionsScene({ location, refreshTick }) {
                     <span className="kioskHazardChip" style={outlook.wind ? { background: outlook.wind.color } : undefined}>
                       {outlook.wind ? outlook.wind.label : "No Wind Risk"}
                     </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="kioskGlanceNiceDay">
+              <div className="kioskGlanceOutlookLabel">
+                Nice Day Forecast <span className="experimentalBadge">Experimental</span>
+              </div>
+              {niceDay === undefined && <div className="kioskLoading">Loading…</div>}
+              {niceDay === null && <div className="kioskEmpty">Unavailable</div>}
+              {niceDay && (
+                <>
+                  <span className="kioskOutlookChip" style={{ background: NICE_DAY_COLORS[niceDay.label] || "#888" }}>
+                    {niceDay.label}
+                  </span>
+                  <div className="kioskNiceDayNote">
+                    {niceDay.reasons.length ? niceDay.reasons.join(", ") : "Comfortable conditions expected"}
                   </div>
                 </>
               )}

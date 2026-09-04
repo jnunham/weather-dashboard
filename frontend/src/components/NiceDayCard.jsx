@@ -14,14 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-
-const LABEL_COLORS = {
-  Great: "#34c759",
-  Good: "#4fa3ff",
-  Fair: "#f5c542",
-  Meh: "#ff9f43",
-  "Not Great": "#ff6b6b",
-};
+import { NICE_DAY_COLORS } from "../utils.js";
 
 function weekday(dateStr) {
   // Append a midday time so this parses as local noon, not UTC midnight —
@@ -72,7 +65,7 @@ export default function NiceDayCard({ location }) {
             {data.days.map((d) => (
               <div className="niceDayRow" key={d.date}>
                 <div className="niceDayDay">{weekday(d.date)}</div>
-                <span className="niceDayLabel" style={{ background: LABEL_COLORS[d.label] || "#888" }}>
+                <span className="niceDayLabel" style={{ background: NICE_DAY_COLORS[d.label] || "#888" }}>
                   {d.label}
                 </span>
                 <div className="niceDayTemp">{d.high_f}°F</div>

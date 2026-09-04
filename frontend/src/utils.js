@@ -23,6 +23,16 @@ export function fmt(n, digits = 0) {
   return n === null || n === undefined || Number.isNaN(n) ? "—" : n.toFixed(digits);
 }
 
+// Shared between the home-page card, its current-conditions glance, and the
+// kiosk conditions scene, so a "Good" day means the same color everywhere.
+export const NICE_DAY_COLORS = {
+  Great: "#34c759",
+  Good: "#4fa3ff",
+  Fair: "#f5c542",
+  Meh: "#ff9f43",
+  "Not Great": "#ff6b6b",
+};
+
 // Minutes between now and an ISO timestamp — lets the UI show "how old is
 // this observation" instead of a bare number with no way to tell a live
 // reading from one the source station stopped updating hours ago.
