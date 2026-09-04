@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Weather Dashboard contributors — see LICENSE.
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 httpx==0.27.2

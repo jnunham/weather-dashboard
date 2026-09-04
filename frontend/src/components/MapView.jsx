@@ -1,3 +1,16 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Weather Dashboard contributors
+//
+// This program is free software: you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the
+// Free Software Foundation, either version 3 of the License, or (at your
+// option) any later version. See the LICENSE file for the full text.
+//
+// This program is distributed WITHOUT ANY WARRANTY and is not a certified
+// life-safety system — during severe weather, always follow official
+// guidance from the National Weather Service and local emergency
+// management, not this app.
+
 import L from "leaflet";
 // Bundled locally rather than a CDN <link> in index.html — this app's whole
 // history of map breakage traces back to direct browser-to-third-party
@@ -93,7 +106,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
 
   // Init map once.
   useEffect(() => {
-    const map = L.map(mapElRef.current, { zoomControl: true }).setView([location.lat, location.lon], 7);
+    const map = L.map(mapElRef.current, { zoomControl: true }).setView([location.lat, location.lon], 8);
     mapRef.current = map;
 
     // Base map is a bundled, offline US state-boundary outline — not live
@@ -152,7 +165,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     const map = mapRef.current;
     if (!map) return;
     markerRef.current.setLatLng([location.lat, location.lon]);
-    map.setView([location.lat, location.lon], Math.max(map.getZoom(), 7));
+    map.setView([location.lat, location.lon], Math.max(map.getZoom(), 8));
   }, [location.lat, location.lon]);
 
   // County boundaries + name labels: redraw whenever the view moves, showing
