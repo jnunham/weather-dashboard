@@ -18,8 +18,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // Bind all interfaces, not just localhost, so other devices on the LAN
-    // (another computer, a phone) can load the dev server too.
-    host: true,
+    // Plain `npm run dev` / `setup.py` (no --lan) is localhost-only,
+    // matching what's printed at startup — LAN access is `setup.py --lan`,
+    // which builds and serves the app from the backend on one port instead
+    // of running this dev server at all.
   },
 });

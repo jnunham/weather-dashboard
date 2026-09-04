@@ -11,13 +11,19 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
-// Same host the page itself was loaded from, backend's port. This makes the
-// app work correctly no matter which device loads the frontend — this
-// machine, or another one on the LAN — since a hardcoded "localhost" would
-// silently point every *other* device's requests back at itself instead of
-// the actual server. Override via VITE_API_BASE_URL only for unusual setups
-// (backend on a different host/port than the frontend).
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+// In a production build (`npm run build`, e.g. via `setup.py --lan`), the
+// backend serves this same frontend from its own single origin — so API
+// calls should be relative ("/api/..."), which always resolves correctly no
+// matter what address/port loaded the page, LAN or not.
+//
+// In dev (`npm run dev`), the frontend and backend are two separate
+// processes on two different ports, so a relative URL would hit Vite's own
+// port instead of the backend's — this falls back to same-host-different-
+// port, since a hardcoded "localhost" would break for any device other than
+// the one running the servers. Override via VITE_API_BASE_URL for unusual
+// setups (backend on a different host/port than the frontend expects).
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? `${window.location.protocol}//${window.location.hostname}:8000` : "");
 
 // Backend calls out to NWS/SPC with their own ~15s timeouts, so a genuinely
 // slow-but-working request can take a while — but a request that hangs

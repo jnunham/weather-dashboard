@@ -146,36 +146,22 @@ def setup_frontend():
     return True
 
 
-def run_dev_servers(lan=False):
-    print("\n=== Starting servers ===")
-    # Localhost-only unless --lan is passed. Binding to 0.0.0.0 by default
-    # was a mistake: on Windows, a process listening on all interfaces for
-    # the first time commonly triggers a Windows Defender Firewall prompt —
-    # if that's missed or not clicked "Allow", the server *looks* started
-    # but nothing can actually reach it. Making LAN access opt-in means the
-    # plain `python3 setup.py` path stays exactly as reliable as it was
-    # before this existed.
-    host = "0.0.0.0" if lan else "127.0.0.1"
+def run_dev_servers():
+    """Two separate processes with hot-reload — best for active development
+    on this one machine. Localhost only; see run_combined_server for LAN use."""
+    print("\n=== Starting dev servers ===")
     backend_proc = subprocess.Popen(
         [
             str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
-            "--reload", "--app-dir", str(BACKEND), "--host", host, "--port", "8000",
+            "--reload", "--app-dir", str(BACKEND), "--host", "127.0.0.1", "--port", "8000",
         ],
         cwd=ROOT,
     )
-    frontend_cmd = [shutil.which("npm"), "run", "dev"]
-    if lan:
-        frontend_cmd += ["--", "--host", "0.0.0.0"]
-    frontend_proc = subprocess.Popen(frontend_cmd, cwd=FRONTEND)
+    frontend_proc = subprocess.Popen([shutil.which("npm"), "run", "dev"], cwd=FRONTEND)
 
     print(f"\nBackend:  {BACKEND_URL}")
     print(f"Frontend: {FRONTEND_URL}")
-    if lan:
-        lan_ip = get_lan_ip()
-        if lan_ip:
-            print(f"\nFrom another device on your network: http://{lan_ip}:5173")
-    else:
-        print("\n(Localhost only. Re-run with --lan to make this reachable from other devices on your network.)")
+    print("\n(Localhost only — for other devices on your network, use --lan instead.)")
     print("\nPress Ctrl+C to stop both.\n")
 
     time.sleep(2)
@@ -200,11 +186,72 @@ def run_dev_servers(lan=False):
                 proc.kill()
 
 
+def build_frontend():
+    print("\n=== Building frontend ===")
+    run([shutil.which("npm"), "run", "build"], cwd=FRONTEND)
+
+
+def run_combined_server(port):
+    """One process, one port: the backend serves the built frontend itself
+    (see main.py's StaticFiles mount) — no CORS, no separate frontend
+    process, and (the point of using port 80/8080 instead of 5173/8000)
+    ordinary web ports that networks and browsers treat as unremarkable,
+    unlike the two "developer" ports some routers/security software single
+    out for extra scrutiny."""
+    print(f"\n=== Starting server on port {port} ===")
+    proc = subprocess.Popen(
+        [str(VENV_PYTHON), "-m", "uvicorn", "app.main:app", "--app-dir", str(BACKEND), "--host", "0.0.0.0", "--port", str(port)],
+        cwd=ROOT,
+    )
+
+    time.sleep(2)
+    if proc.poll() is not None:
+        # Exited already — on Linux/macOS this is almost always permission
+        # denied for a port under 1024, which needs elevated privileges to
+        # bind. Full output is above (not captured, so you can see the real
+        # error). Fall back to 8080, which needs no special privileges.
+        if port < 1024:
+            print(f"\nCouldn't bind port {port} (see the error above — on Linux/macOS this usually means it needs elevated privileges).")
+            print(f"Falling back to port 8080 for now.")
+            if not IS_WINDOWS:
+                print(f"To use port {port} without sudo in the future, run this once:")
+                print(f"  sudo setcap 'cap_net_bind_service=+ep' {VENV_PYTHON}")
+            print()
+            return run_combined_server(8080)
+        print("\nServer exited immediately — see the error above.")
+        sys.exit(1)
+
+    port_suffix = "" if port == 80 else f":{port}"
+    url = f"http://localhost{port_suffix}"
+    print(f"\nOpen: {url}")
+    lan_ip = get_lan_ip()
+    if lan_ip:
+        print(f"From another device on your network: http://{lan_ip}{port_suffix}")
+    print("\nPress Ctrl+C to stop.\n")
+
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        print("\nStopping...")
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--setup-only", action="store_true", help="install everything but don't start the servers")
     parser.add_argument(
-        "--lan", action="store_true", help="bind both servers to all network interfaces, reachable from other devices on your LAN"
+        "--lan",
+        action="store_true",
+        help="build the frontend and serve everything from one address on your network (port 80, falling back to 8080 if that needs elevated privileges) — recommended for reaching this from other devices",
     )
     args = parser.parse_args()
 
@@ -219,7 +266,11 @@ def main():
         print("\nBackend is set up, but the frontend can't start without Node.js. Install it, then re-run this script.")
         sys.exit(1)
 
-    run_dev_servers(lan=args.lan)
+    if args.lan:
+        build_frontend()
+        run_combined_server(80)
+    else:
+        run_dev_servers()
 
 
 if __name__ == "__main__":

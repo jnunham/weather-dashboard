@@ -40,12 +40,15 @@ async def health():
     return {"status": "ok", "default_location": DEFAULT_LOCATION}
 
 
-# In production, build the frontend (`npm run build`) and uncomment this to
-# serve it from the same FastAPI process/origin — avoids CORS entirely and
-# makes this a single deployable service:
-#
-# from pathlib import Path
-# from fastapi.staticfiles import StaticFiles
-# frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-# if frontend_dist.exists():
-#     app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+# If the frontend has been built (`npm run build`, or `setup.py --lan`, which
+# does this automatically), serve it from this same process/origin — one
+# port, one address, no CORS involved at all since nothing is cross-origin
+# anymore. A no-op (and harmless) when frontend/dist doesn't exist, e.g. in
+# normal two-server local dev.
+from pathlib import Path  # noqa: E402
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
