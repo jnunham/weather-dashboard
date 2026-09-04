@@ -87,7 +87,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
   const alertsLayerRef = useRef(null);
   const outlookLayerRef = useRef(null);
   const countiesLayerRef = useRef(null);
-  const radarRef = useRef({ frames: [], layers: [], currentLayer: null, index: 0 });
+  const radarRef = useRef({ frames: [], layers: [], timers: [], currentLayer: null, index: 0 });
 
   const [radarFrameCount, setRadarFrameCount] = useState(0);
   const [radarIndex, setRadarIndex] = useState(0);
@@ -310,13 +310,26 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
 
         // Drop any previously prefetched layers before replacing them.
         (radarRef.current.layers || []).forEach((l) => map && map.hasLayer(l) && map.removeLayer(l));
+        (radarRef.current.timers || []).forEach((t) => clearTimeout(t));
 
-        const frames = [...data.radar.past, ...(data.radar.nowcast || [])];
+        // Each tile layer needs dozens of individual tile requests for the
+        // current viewport — adding every frame (previously ~13-16) to the
+        // map at once meant hundreds of simultaneous requests competing for
+        // the browser's ~6-connections-per-origin limit, so frames were
+        // routinely still loading when the animation looped back to them
+        // (the "choppy / keeps disappearing" symptom). Two changes: keep
+        // fewer past frames, and stagger adding the non-current ones instead
+        // of firing them all in the same tick.
+        const MAX_PAST_FRAMES = 8;
+        const pastFrames = data.radar.past.slice(-MAX_PAST_FRAMES);
+        const frames = [...pastFrames, ...(data.radar.nowcast || [])];
+        const initialIndex = pastFrames.length - 1;
+
         radarRef.current.frames = frames;
         radarRef.current.currentLayer = null;
-        radarRef.current.layers = frames.map((frame) => {
-          const url = `${API_BASE}/api/radar/tile${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-          const layer = L.tileLayer(url, {
+        radarRef.current.timers = [];
+        radarRef.current.layers = frames.map((frame) =>
+          L.tileLayer(`${API_BASE}/api/radar/tile${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
             opacity: 0,
             zIndex: 5,
             // RainViewer's radar mosaic only actually renders up to zoom 7 —
@@ -328,16 +341,22 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
             // to keep working for the state-outline/alert/outlook layers.
             maxNativeZoom: 7,
             maxZoom: 19,
-          });
-          // Pre-add every frame now (hidden) so its tiles fetch in the
-          // background immediately, rather than on first display during
-          // playback.
-          layer.addTo(map);
-          return layer;
-        });
+          })
+        );
 
         setRadarFrameCount(frames.length);
-        showRadarFrame(data.radar.past.length - 1);
+        // The current frame loads immediately — it's the one actually
+        // visible right now. The rest prefetch in the background, ~200ms
+        // apart by distance from "now", so playback has usually caught up
+        // to a frame's tiles by the time the loop reaches it.
+        showRadarFrame(initialIndex);
+        radarRef.current.layers.forEach((layer, i) => {
+          if (i === initialIndex) return;
+          const timer = setTimeout(() => {
+            if (mapRef.current && !mapRef.current.hasLayer(layer)) layer.addTo(mapRef.current);
+          }, Math.abs(i - initialIndex) * 200);
+          radarRef.current.timers.push(timer);
+        });
       } catch {
         setRadarTimeLabel("Radar unavailable");
       }
@@ -346,6 +365,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     load();
     return () => {
       cancelled = true;
+      (radarRef.current.timers || []).forEach((t) => clearTimeout(t));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);

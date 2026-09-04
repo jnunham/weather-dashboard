@@ -319,7 +319,7 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 
 /* ---------- Kiosk mode ---------- */
 
-.kiosk { display: flex; flex-direction: column; height: 100%; background: var(--bg); }
+.kiosk { display: flex; flex-direction: column; height: 100%; background: var(--bg); cursor: none; }
 
 .kioskHeader {
   display: flex;
@@ -526,7 +526,7 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 
 /* ---------- Severe weather mode ---------- */
 
-.severeMode { display: flex; flex-direction: column; height: 100%; background: var(--bg); }
+.severeMode { display: flex; flex-direction: column; height: 100%; background: var(--bg); cursor: none; }
 
 .severeModeBody { flex: 1 1 auto; min-height: 0; display: flex; gap: 1px; background: var(--border); }
 
