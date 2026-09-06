@@ -54,24 +54,31 @@ export default function CurrentConditionsCard({ location, refreshTick }) {
         {!error && !data && "Loading…"}
         {data && (
           <>
-            <div className="tempRow">{fmt(data.temperature_f)}°F</div>
-            <div className="condRow">
-              {data.text_description || ""} &middot; {data.station_name}
-            </div>
-            {(() => {
-              const minutesAgo = minutesSince(data.observed_at);
-              if (minutesAgo === null) return null;
-              const label = minutesAgo < 1 ? "just now" : minutesAgo < 60 ? `${minutesAgo} min ago` : `${Math.round(minutesAgo / 60)} hr ago`;
-              // This station's own report age, not this app's refresh cycle — a
-              // number here that stops changing means the source station
-              // stopped reporting, not that the dashboard stopped polling it.
-              return (
-                <div className="obsRow">
-                  Observed {label}
-                  {minutesAgo > 90 && <span className="staleBadge"> — this station may be delayed</span>}
+            <div className="conditionsHeader">
+              {data.icon && <img className="conditionsIcon" src={data.icon} alt="" />}
+              <div>
+                <div className="tempRow">{fmt(data.temperature_f)}°F</div>
+                <div className="condRow">
+                  {data.text_description || ""} &middot; {data.station_name}
                 </div>
-              );
-            })()}
+                {(() => {
+                  const minutesAgo = minutesSince(data.observed_at);
+                  if (minutesAgo === null) return null;
+                  const label =
+                    minutesAgo < 1 ? "just now" : minutesAgo < 60 ? `${minutesAgo} min ago` : `${Math.round(minutesAgo / 60)} hr ago`;
+                  // This station's own report age, not this app's refresh cycle
+                  // — a number here that stops changing means the source
+                  // station stopped reporting, not that the dashboard stopped
+                  // polling it.
+                  return (
+                    <div className="obsRow">
+                      Observed {label}
+                      {minutesAgo > 90 && <span className="staleBadge"> — this station may be delayed</span>}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
             <div className="metaGrid">
               <div>
                 <span>Feels like</span> {fmt(data.feels_like_f)}°F

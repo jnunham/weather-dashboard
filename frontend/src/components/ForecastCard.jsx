@@ -41,10 +41,13 @@ export default function ForecastCard({ location, refreshTick }) {
         {periods &&
           periods.slice(0, 4).map((p) => (
             <div className="forecastPeriod" key={p.name}>
-              <div className="pname">
-                {p.name} <span className="ptemp">{p.temperature}°{p.temperature_unit}</span>
+              {p.icon && <img className="forecastIcon" src={p.icon} alt="" />}
+              <div className="forecastPeriodBody">
+                <div className="pname">
+                  {p.name} <span className="ptemp">{p.temperature}°{p.temperature_unit}</span>
+                </div>
+                <div>{p.short_forecast}</div>
               </div>
-              <div>{p.short_forecast}</div>
             </div>
           ))}
       </div>

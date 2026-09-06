@@ -93,7 +93,11 @@ def _extract_image(html: str) -> Optional[str]:
 
 
 async def _fetch_rss_items(url: str) -> list[dict]:
-    async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+    # Shorter than the other feeds' 15s: this one runs concurrently with the
+    # state lookup under a 16s client-side abort budget (see api.js), so a
+    # slow response here should fail fast and fall back to stale/cached data
+    # rather than eating the whole budget and leaving no room to recover.
+    async with httpx.AsyncClient(headers=HEADERS, timeout=8) as client:
         try:
             resp = await client.get(url)
             resp.raise_for_status()
@@ -144,7 +148,7 @@ async def get_mesoscale_discussions(lat: Optional[float] = None, lon: Optional[f
     # was needlessly doubling the wait (each can take a few seconds on its
     # own, which was likely presenting as the scene getting stuck loading).
     items, state_name = await asyncio.gather(
-        cached("spc-mds", 60, fetch),
+        cached("spc-mds", 60, fetch, stale_ok=True),
         _state_name_for(lat, lon),
     )
     if state_name:

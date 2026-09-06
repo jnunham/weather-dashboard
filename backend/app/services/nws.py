@@ -131,6 +131,7 @@ async def get_current_conditions(lat: float, lon: float) -> dict:
         "station_name": station_name,
         "observed_at": p.get("timestamp"),
         "text_description": p.get("textDescription"),
+        "icon": p.get("icon"),
         "temperature_f": temp_f,
         "feels_like_f": wind_chill_f or heat_index_f or temp_f,
         "humidity_pct": round(p["relativeHumidity"]["value"], 0) if p.get("relativeHumidity", {}).get("value") is not None else None,
@@ -149,14 +150,20 @@ async def get_forecast(lat: float, lon: float) -> dict:
         return await _get_json(point["forecast"])
 
     data = await cached(f"forecast:{point['forecast']}", 900, fetch)
-    periods = data["properties"]["periods"][:6]
+    # A full week of day/night periods — the home page only shows the first
+    # few, but kiosk mode's "Coming Days" scene wants a whole week to pair
+    # against the Nice Day Forecast's own 7-day range.
+    periods = data["properties"]["periods"][:14]
     return {
         "periods": [
             {
                 "name": p["name"],
+                "start_time": p.get("startTime"),
+                "is_daytime": p.get("isDaytime"),
                 "temperature": p["temperature"],
                 "temperature_unit": p["temperatureUnit"],
                 "short_forecast": p["shortForecast"],
+                "icon": p.get("icon"),
                 "wind_speed": p.get("windSpeed"),
                 "wind_direction": p.get("windDirection"),
             }

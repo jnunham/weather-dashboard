@@ -31,7 +31,7 @@ _store: dict[str, dict] = {}
 _locks: dict[str, asyncio.Lock] = {}
 
 
-async def cached(key: str, ttl_seconds: float, fetch_fn: Callable[[], Awaitable[T]]) -> T:
+async def cached(key: str, ttl_seconds: float, fetch_fn: Callable[[], Awaitable[T]], stale_ok: bool = False) -> T:
     entry = _store.get(key)
     now = time.time()
     if entry and now - entry["ts"] < ttl_seconds:
@@ -42,6 +42,18 @@ async def cached(key: str, ttl_seconds: float, fetch_fn: Callable[[], Awaitable[
         entry = _store.get(key)
         if entry and time.time() - entry["ts"] < ttl_seconds:
             return entry["value"]
-        value = await fetch_fn()
+        try:
+            value = await fetch_fn()
+        except Exception:
+            # stale_ok is for feeds where "we couldn't check upstream" and
+            # "there's genuinely nothing to report" are different claims
+            # (e.g. active weather discussions) — a flaky connection then
+            # degrades to serving the last known-good value instead of
+            # forcing every caller to treat "temporarily unreachable" the
+            # same as an empty result. Only kicks in once something has
+            # actually been fetched successfully at least once.
+            if stale_ok and entry is not None:
+                return entry["value"]
+            raise
         _store[key] = {"value": value, "ts": time.time()}
         return value

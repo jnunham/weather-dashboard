@@ -14,10 +14,10 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { alertClass, fetchOutlookBreakdown, fmt, NICE_DAY_COLORS, topAlert } from "../utils.js";
+import { alertClass, fetchOutlookBreakdown, fmt, minutesSince, NICE_DAY_COLORS, topAlert } from "../utils.js";
 import MapView from "./MapView.jsx";
 
-const ALL_SCENES = ["map", "conditions", "mds", "afd"];
+const ALL_SCENES = ["map", "conditions", "days", "mds", "afd"];
 const DEFAULT_SCENE_DURATION_MS = 25 * 1000;
 const DATA_REFRESH_MS = 5 * 60 * 1000;
 const CLOCK_TICK_MS = 1000;
@@ -104,10 +104,23 @@ function KioskConditionsScene({ location, refreshTick }) {
           {!error && !conditions && <div className="kioskLoading">Loading…</div>}
           {conditions && (
             <div className="kioskConditionsMain">
+              {conditions.icon && <img className="kioskCondIcon" src={conditions.icon} alt="" />}
               <div className="kioskTempBlock">
                 <div className="kioskTempBig">{fmt(conditions.temperature_f)}°F</div>
                 <div className="kioskCondText">{conditions.text_description}</div>
                 <div className="kioskStationText">{conditions.station_name}</div>
+                {(() => {
+                  const minutesAgo = minutesSince(conditions.observed_at);
+                  if (minutesAgo === null) return null;
+                  const label =
+                    minutesAgo < 1 ? "just now" : minutesAgo < 60 ? `${minutesAgo} min ago` : `${Math.round(minutesAgo / 60)} hr ago`;
+                  return (
+                    <div className="kioskObsText">
+                      Observed {label}
+                      {minutesAgo > 90 && <span className="staleBadge"> — may be delayed</span>}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="kioskConditionsStats">
                 <div>
@@ -155,7 +168,7 @@ function KioskConditionsScene({ location, refreshTick }) {
                   </span>
                   <div className="kioskHazardRow">
                     <span className="kioskHazardChip" style={outlook.torn ? { background: outlook.torn.color } : undefined}>
-                      {outlook.torn ? outlook.torn.label : "No Tornado Risk"}
+                      {outlook.torn ? outlook.torn.label : "No Tor Risk"}
                     </span>
                     <span className="kioskHazardChip" style={outlook.hail ? { background: outlook.hail.color } : undefined}>
                       {outlook.hail ? outlook.hail.label : "No Hail Risk"}
@@ -190,7 +203,10 @@ function KioskConditionsScene({ location, refreshTick }) {
             <div className="kioskForecastRow">
               {periods.slice(0, 4).map((p) => (
                 <div className="kioskForecastCard" key={p.name}>
-                  <div className="kioskForecastName">{p.name}</div>
+                  <div className="kioskForecastCardHead">
+                    {p.icon && <img className="kioskForecastIcon" src={p.icon} alt="" />}
+                    <div className="kioskForecastName">{p.name}</div>
+                  </div>
                   <div className="kioskForecastTemp">
                     {p.temperature}°{p.temperature_unit}
                   </div>
@@ -223,22 +239,100 @@ function KioskConditionsScene({ location, refreshTick }) {
   );
 }
 
+// A week-ahead glance: one card per daytime forecast period, paired by date
+// with that same day's Nice Day Forecast score — the home page keeps those
+// as two separate cards, but kiosk mode has no scrolling, so combining them
+// here is the only way to show both without adding yet another scene.
+function KioskDaysScene({ location, refreshTick }) {
+  const [periods, setPeriods] = useState(null);
+  const [niceDayByDate, setNiceDayByDate] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    api
+      .forecast(location.lat, location.lon)
+      .then((d) => !cancelled && setPeriods(d.periods))
+      .catch((err) => !cancelled && setError(err.message));
+
+    api
+      .niceDayForecast(location.lat, location.lon)
+      .then((d) => {
+        if (cancelled) return;
+        setNiceDayByDate(Object.fromEntries((d.days || []).map((day) => [day.date, day])));
+      })
+      .catch(() => !cancelled && setNiceDayByDate({}));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.lat, location.lon, refreshTick]);
+
+  const dayCards = (periods || []).filter((p) => p.is_daytime).slice(0, 6);
+
+  return (
+    <div className="kioskScene kioskDaysScene">
+      <h2 className="kioskSceneTitle">
+        Coming Days <span className="experimentalBadge">Nice Day: Experimental</span>
+      </h2>
+      {error && <div className="errorText">{error}</div>}
+      {!error && !periods && <div className="kioskLoading">Loading…</div>}
+      {periods && (
+        <div className="kioskDaysGrid">
+          {dayCards.map((p) => {
+            const date = p.start_time ? p.start_time.slice(0, 10) : null;
+            const niceDay = date ? niceDayByDate?.[date] : null;
+            return (
+              <div className="kioskDayCard" key={p.name}>
+                <div className="kioskDayName">{p.name}</div>
+                {p.icon && <img className="kioskDayIcon" src={p.icon} alt="" />}
+                <div className="kioskDayTemp">
+                  {p.temperature}°{p.temperature_unit}
+                </div>
+                <div className="kioskDayText">{p.short_forecast}</div>
+                {niceDay && (
+                  <span className="kioskDayNiceDayChip" style={{ background: NICE_DAY_COLORS[niceDay.label] || "#888" }}>
+                    {niceDay.label}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KioskMdScene({ location, refreshTick }) {
   const [mds, setMds] = useState(null);
   const [stateName, setStateName] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
+    // Failsafe: an unattended wall display can't afford to sit on
+    // "Loading…" forever if something upstream hangs — fall back to the
+    // same "nothing to show" state a confirmed-empty feed would render.
+    const failsafe = setTimeout(() => {
+      if (!cancelled) setMds((current) => current ?? []);
+    }, 20000);
     api
       .mesoscaleDiscussions(location.lat, location.lon)
       .then((d) => {
         if (cancelled) return;
+        clearTimeout(failsafe);
         setMds(d.items);
         setStateName(d.filtered_to_state);
       })
-      .catch(() => !cancelled && setMds([]));
+      .catch(() => {
+        if (cancelled) return;
+        clearTimeout(failsafe);
+        setMds([]);
+      });
     return () => {
       cancelled = true;
+      clearTimeout(failsafe);
     };
   }, [location.lat, location.lon, refreshTick]);
 
@@ -375,6 +469,7 @@ export default function KioskView({ location }) {
           />
         )}
         {scene === "conditions" && <KioskConditionsScene location={location} refreshTick={refreshTick} />}
+        {scene === "days" && <KioskDaysScene location={location} refreshTick={refreshTick} />}
         {scene === "mds" && <KioskMdScene location={location} refreshTick={refreshTick} />}
         {scene === "afd" && <KioskAfdScene location={location} refreshTick={refreshTick} />}
       </div>

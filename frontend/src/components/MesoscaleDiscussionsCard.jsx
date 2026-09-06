@@ -23,16 +23,29 @@ export default function MesoscaleDiscussionsCard({ location, refreshTick }) {
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    // Belt-and-suspenders failsafe: the backend already fails fast and
+    // serves stale data on a flaky upstream (see cache.py's stale_ok), but
+    // this guarantees the card can never sit on "Loading…" indefinitely no
+    // matter what goes wrong between here and there.
+    const failsafe = setTimeout(() => {
+      if (!cancelled) setError("Mesoscale discussions unavailable right now.");
+    }, 20000);
     api
       .mesoscaleDiscussions(location?.lat, location?.lon)
       .then((d) => {
         if (cancelled) return;
+        clearTimeout(failsafe);
         setItems(d.items);
         setStateName(d.filtered_to_state);
       })
-      .catch((err) => !cancelled && setError(err.message));
+      .catch((err) => {
+        if (cancelled) return;
+        clearTimeout(failsafe);
+        setError(err.message);
+      });
     return () => {
       cancelled = true;
+      clearTimeout(failsafe);
     };
   }, [location?.lat, location?.lon, refreshTick]);
 

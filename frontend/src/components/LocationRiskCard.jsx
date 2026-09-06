@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 
-import { fetchOutlookBreakdown } from "../utils.js";
+import { fetchOutlookBreakdown, HAZARD_SHORT_LABELS } from "../utils.js";
 
 // Split out of OutlookCard and placed right under Current Conditions: "is
 // there a risk where I actually am" is a more urgent question than the SPC
@@ -51,7 +51,7 @@ export default function LocationRiskCard({ location, day }) {
               .filter((h) => h in breakdown)
               .map((h) => (
                 <span key={h} className={breakdown[h] ? "" : "noRisk"} style={breakdown[h] ? { background: breakdown[h].color } : undefined}>
-                  {breakdown[h] ? breakdown[h].label : `No ${h === "prob" ? "Severe" : h[0].toUpperCase() + h.slice(1)} Risk`}
+                  {breakdown[h] ? breakdown[h].label : `No ${h === "prob" ? "Severe" : HAZARD_SHORT_LABELS[h] || h} Risk`}
                 </span>
               ))}
           </div>

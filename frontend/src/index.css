@@ -182,6 +182,9 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 
 .cardBody { font-size: 13px; line-height: 1.4; }
 
+.conditionsHeader { display: flex; align-items: flex-start; gap: 10px; }
+.conditionsIcon { width: 52px; height: 52px; flex: 0 0 auto; margin-top: -4px; }
+
 .tempRow { font-size: 28px; font-weight: 700; }
 .condRow { color: var(--muted); margin-bottom: 6px; }
 .obsRow { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
@@ -189,10 +192,12 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .metaGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 6px; }
 .metaGrid div span { color: var(--muted); }
 
-.forecastPeriod { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.forecastPeriod { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .forecastPeriod:last-child { border-bottom: none; }
 .forecastPeriod .pname { font-weight: 600; }
 .forecastPeriod .ptemp { color: var(--accent); }
+.forecastIcon { width: 36px; height: 36px; flex: 0 0 auto; }
+.forecastPeriodBody { min-width: 0; }
 
 .listItem { padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
 .listItem:last-child { border-bottom: none; }
@@ -456,10 +461,12 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 
 .kioskConditionsMain { display: flex; gap: 48px; align-items: center; margin-bottom: 28px; }
 
+.kioskCondIcon { width: 110px; height: 110px; flex: 0 0 auto; }
 .kioskTempBlock { flex: 0 0 auto; }
 .kioskTempBig { font-size: 80px; font-weight: 700; line-height: 1; }
 .kioskCondText { font-size: 22px; color: var(--text); margin-top: 8px; }
 .kioskStationText { font-size: 15px; color: var(--muted); margin-top: 4px; }
+.kioskObsText { font-size: 14px; color: var(--muted); margin-top: 6px; }
 
 .kioskConditionsStats {
   display: grid;
@@ -516,9 +523,27 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
   border-radius: 12px;
   padding: 16px;
 }
-.kioskForecastName { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.kioskForecastCardHead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.kioskForecastIcon { width: 32px; height: 32px; flex: 0 0 auto; }
+.kioskForecastName { font-size: 15px; font-weight: 700; }
 .kioskForecastTemp { font-size: 22px; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
 .kioskForecastText { font-size: 13px; color: var(--text); }
+
+/* Coming Days scene: one card per day, pairing NWS's forecast icon/text
+   with that same date's Nice Day Forecast score. */
+.kioskDaysGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
+.kioskDayCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+.kioskDayName { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.kioskDayIcon { width: 64px; height: 64px; margin: 0 auto 8px; display: block; }
+.kioskDayTemp { font-size: 24px; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
+.kioskDayText { font-size: 13px; color: var(--text); margin-bottom: 12px; min-height: 34px; }
+.kioskDayNiceDayChip { display: inline-block; padding: 4px 12px; border-radius: 8px; color: #06111f; font-weight: 700; font-size: 13px; }
 
 /* Condensed list cards used for Watches & Warnings / SPC Watches on the
    Current Conditions scene — smaller than the standalone kioskAlertCard

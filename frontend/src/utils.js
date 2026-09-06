@@ -123,6 +123,11 @@ export function findOutlookCategory(lat, lon, outlookGeoJson) {
   return { label: best.properties.LABEL2 || best.properties.LABEL, color: best.properties.fill || "#888" };
 }
 
+// Short labels for the "No ___ Risk" fallback chips — "torn" capitalized
+// verbatim reads as the broken word "Torn", and "Tornado" made those chips
+// visibly wider than their "Hail"/"Wind" neighbors, so this is used instead.
+export const HAZARD_SHORT_LABELS = { torn: "Tor", hail: "Hail", wind: "Wind" };
+
 // Day 3 only publishes a combined probabilistic-severe layer, not separate
 // tornado/hail/wind — SPC doesn't break those out that far ahead.
 const HAZARDS_BY_DAY = { "1": ["torn", "hail", "wind"], "2": ["torn", "hail", "wind"], "3": ["prob"] };

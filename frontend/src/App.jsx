@@ -97,6 +97,7 @@ export default function App() {
           <CurrentConditionsCard location={location} refreshTick={refreshTick} />
           <LocationRiskCard location={location} day={outlookDay} />
           <ForecastCard location={location} refreshTick={refreshTick} />
+          <NiceDayCard location={location} />
           <AlertsCard location={location} refreshTick={refreshTick} />
           <OutlookCard
             day={outlookDay}
@@ -106,7 +107,6 @@ export default function App() {
           />
           <MesoscaleDiscussionsCard location={location} refreshTick={refreshTick} />
           <AfdCard location={location} refreshTick={refreshTick} />
-          <NiceDayCard location={location} />
         </aside>
       </main>
     </div>
