@@ -22,7 +22,6 @@ import LocationPrompt from "./components/LocationPrompt.jsx";
 import LocationRiskCard from "./components/LocationRiskCard.jsx";
 import MapView from "./components/MapView.jsx";
 import MesoscaleDiscussionsCard from "./components/MesoscaleDiscussionsCard.jsx";
-import NiceDayCard from "./components/NiceDayCard.jsx";
 import OutlookCard from "./components/OutlookCard.jsx";
 import Ticker from "./components/Ticker.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -97,7 +96,6 @@ export default function App() {
           <CurrentConditionsCard location={location} refreshTick={refreshTick} />
           <LocationRiskCard location={location} day={outlookDay} />
           <ForecastCard location={location} refreshTick={refreshTick} />
-          <NiceDayCard location={location} />
           <AlertsCard location={location} refreshTick={refreshTick} />
           <OutlookCard
             day={outlookDay}

@@ -19,6 +19,7 @@ export default function MesoscaleDiscussionsCard({ location, refreshTick }) {
   const [items, setItems] = useState(null);
   const [stateName, setStateName] = useState(null);
   const [error, setError] = useState(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +48,17 @@ export default function MesoscaleDiscussionsCard({ location, refreshTick }) {
       cancelled = true;
       clearTimeout(failsafe);
     };
-  }, [location?.lat, location?.lon, refreshTick]);
+  }, [location?.lat, location?.lon, refreshTick, retryTick]);
+
+  // A failure here is normally a transient network blip, not a 5-minute
+  // outage — retry much sooner than the dashboard's normal refresh cadence
+  // so a flaky connection recovers in tens of seconds instead of sitting on
+  // an error for most of the next five minutes.
+  useEffect(() => {
+    if (!error) return undefined;
+    const id = setTimeout(() => setRetryTick((t) => t + 1), 30000);
+    return () => clearTimeout(id);
+  }, [error]);
 
   return (
     <section className="card">

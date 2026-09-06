@@ -47,13 +47,14 @@ export default function LocationRiskCard({ location, day }) {
         {breakdown && (
           <div className="outlookBreakdownChips">
             <span style={{ background: breakdown.category?.color || "#888" }}>{breakdown.category?.label || "None"}</span>
-            {["torn", "hail", "wind", "prob"]
-              .filter((h) => h in breakdown)
-              .map((h) => (
-                <span key={h} className={breakdown[h] ? "" : "noRisk"} style={breakdown[h] ? { background: breakdown[h].color } : undefined}>
-                  {breakdown[h] ? breakdown[h].label : `No ${h === "prob" ? "Severe" : HAZARD_SHORT_LABELS[h] || h} Risk`}
-                </span>
-              ))}
+            {breakdown.category &&
+              ["torn", "hail", "wind", "prob"]
+                .filter((h) => h in breakdown)
+                .map((h) => (
+                  <span key={h} className={breakdown[h] ? "" : "noRisk"} style={breakdown[h] ? { background: breakdown[h].color } : undefined}>
+                    {breakdown[h] ? breakdown[h].label : `No ${h === "prob" ? "Severe" : HAZARD_SHORT_LABELS[h] || h} Risk`}
+                  </span>
+                ))}
           </div>
         )}
       </div>

@@ -14,12 +14,11 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { fmt, minutesSince, NICE_DAY_COLORS } from "../utils.js";
+import { fmt, minutesSince } from "../utils.js";
 
 export default function CurrentConditionsCard({ location, refreshTick }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [niceDay, setNiceDay] = useState(undefined); // undefined = loading, null = unavailable
 
   useEffect(() => {
     let cancelled = false;
@@ -29,18 +28,6 @@ export default function CurrentConditionsCard({ location, refreshTick }) {
       .conditions(location.lat, location.lon)
       .then((d) => !cancelled && setData(d))
       .catch((err) => !cancelled && setError(err.message));
-    return () => {
-      cancelled = true;
-    };
-  }, [location.lat, location.lon, refreshTick]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setNiceDay(undefined);
-    api
-      .niceDayForecast(location.lat, location.lon)
-      .then((d) => !cancelled && setNiceDay(d.days?.[0] || null))
-      .catch(() => !cancelled && setNiceDay(null));
     return () => {
       cancelled = true;
     };
@@ -100,17 +87,6 @@ export default function CurrentConditionsCard({ location, refreshTick }) {
                 <span>Visibility</span> {data.visibility_mi != null ? `${fmt(data.visibility_mi, 1)} mi` : "—"}
               </div>
             </div>
-            {niceDay && (
-              <div className="niceDayGlance">
-                <span className="niceDayLabel" style={{ background: NICE_DAY_COLORS[niceDay.label] || "#888" }}>
-                  {niceDay.label}
-                </span>
-                <span className="niceDayGlanceText">
-                  Nice Day Forecast: {niceDay.reasons.length ? niceDay.reasons.join(", ") : "comfortable"}
-                </span>
-                <span className="experimentalBadge">Experimental</span>
-              </div>
-            )}
           </>
         )}
       </div>

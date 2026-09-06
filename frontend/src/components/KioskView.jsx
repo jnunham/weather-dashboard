@@ -166,24 +166,24 @@ function KioskConditionsScene({ location, refreshTick }) {
                   <span className="kioskOutlookChip" style={{ background: outlook.category?.color || "#888" }}>
                     {outlook.category?.label || "None"}
                   </span>
-                  <div className="kioskHazardRow">
-                    <span className="kioskHazardChip" style={outlook.torn ? { background: outlook.torn.color } : undefined}>
-                      {outlook.torn ? outlook.torn.label : "No Tor Risk"}
-                    </span>
-                    <span className="kioskHazardChip" style={outlook.hail ? { background: outlook.hail.color } : undefined}>
-                      {outlook.hail ? outlook.hail.label : "No Hail Risk"}
-                    </span>
-                    <span className="kioskHazardChip" style={outlook.wind ? { background: outlook.wind.color } : undefined}>
-                      {outlook.wind ? outlook.wind.label : "No Wind Risk"}
-                    </span>
-                  </div>
+                  {outlook.category && (
+                    <div className="kioskHazardRow">
+                      <span className="kioskHazardChip" style={outlook.torn ? { background: outlook.torn.color } : undefined}>
+                        {outlook.torn ? outlook.torn.label : "No Tor Risk"}
+                      </span>
+                      <span className="kioskHazardChip" style={outlook.hail ? { background: outlook.hail.color } : undefined}>
+                        {outlook.hail ? outlook.hail.label : "No Hail Risk"}
+                      </span>
+                      <span className="kioskHazardChip" style={outlook.wind ? { background: outlook.wind.color } : undefined}>
+                        {outlook.wind ? outlook.wind.label : "No Wind Risk"}
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
             <div className="kioskGlanceNiceDay">
-              <div className="kioskGlanceOutlookLabel">
-                Nice Day Forecast <span className="experimentalBadge">Experimental</span>
-              </div>
+              <div className="kioskGlanceOutlookLabel">Nice Day Forecast</div>
               {niceDay === undefined && <div className="kioskLoading">Loading…</div>}
               {niceDay === null && <div className="kioskEmpty">Unavailable</div>}
               {niceDay && (
@@ -273,9 +273,7 @@ function KioskDaysScene({ location, refreshTick }) {
 
   return (
     <div className="kioskScene kioskDaysScene">
-      <h2 className="kioskSceneTitle">
-        Coming Days <span className="experimentalBadge">Nice Day: Experimental</span>
-      </h2>
+      <h2 className="kioskSceneTitle">Coming Days</h2>
       {error && <div className="errorText">{error}</div>}
       {!error && !periods && <div className="kioskLoading">Loading…</div>}
       {periods && (
@@ -308,14 +306,20 @@ function KioskDaysScene({ location, refreshTick }) {
 function KioskMdScene({ location, refreshTick }) {
   const [mds, setMds] = useState(null);
   const [stateName, setStateName] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setFailed(false);
     // Failsafe: an unattended wall display can't afford to sit on
     // "Loading…" forever if something upstream hangs — fall back to the
     // same "nothing to show" state a confirmed-empty feed would render.
     const failsafe = setTimeout(() => {
-      if (!cancelled) setMds((current) => current ?? []);
+      if (!cancelled) {
+        setMds((current) => current ?? []);
+        setFailed(true);
+      }
     }, 20000);
     api
       .mesoscaleDiscussions(location.lat, location.lon)
@@ -329,12 +333,22 @@ function KioskMdScene({ location, refreshTick }) {
         if (cancelled) return;
         clearTimeout(failsafe);
         setMds([]);
+        setFailed(true);
       });
     return () => {
       cancelled = true;
       clearTimeout(failsafe);
     };
-  }, [location.lat, location.lon, refreshTick]);
+  }, [location.lat, location.lon, refreshTick, retryTick]);
+
+  // Same reasoning as the home-page card: a failure here is usually a
+  // transient blip, so retry well before the normal 5-minute cadence rather
+  // than leaving an unattended wall display on stale/empty data that long.
+  useEffect(() => {
+    if (!failed) return undefined;
+    const id = setTimeout(() => setRetryTick((t) => t + 1), 30000);
+    return () => clearTimeout(id);
+  }, [failed]);
 
   return (
     <div className="kioskScene kioskMdScene">
