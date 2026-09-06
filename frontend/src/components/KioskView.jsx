@@ -261,8 +261,11 @@ function KioskDaysScene({ location, refreshTick }) {
       {periods && (
         <div className="kioskDaysGrid">
           {dayCards.map((p) => {
+            // Nice Day Forecast is scored per calendar date, not per
+            // day/night period — Tonight and Today share a date, so Tonight
+            // gets the same chip rather than conspicuously having none.
             const date = p.start_time ? p.start_time.slice(0, 10) : null;
-            const niceDay = date && p.is_daytime ? niceDayByDate?.[date] : null;
+            const niceDay = date ? niceDayByDate?.[date] : null;
             return (
               <div className="kioskDayCard" key={p.name}>
                 <div className="kioskDayName">{p.name}</div>
