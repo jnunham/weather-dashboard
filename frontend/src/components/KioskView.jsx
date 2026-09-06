@@ -47,7 +47,6 @@ function readKioskConfig() {
 // a second list of the same watches added nothing but confusion.)
 function KioskConditionsScene({ location, refreshTick }) {
   const [conditions, setConditions] = useState(null);
-  const [periods, setPeriods] = useState(null);
   const [error, setError] = useState(null);
   const [topAlertItem, setTopAlertItem] = useState(undefined); // undefined = loading, null = none
   const [outlook, setOutlook] = useState(undefined);
@@ -62,11 +61,6 @@ function KioskConditionsScene({ location, refreshTick }) {
       .conditions(location.lat, location.lon)
       .then((d) => !cancelled && setConditions(d))
       .catch((err) => !cancelled && setError(err.message));
-
-    api
-      .forecast(location.lat, location.lon)
-      .then((d) => !cancelled && setPeriods(d.periods))
-      .catch(() => {});
 
     api
       .alerts(location.lat, location.lon)
@@ -198,23 +192,6 @@ function KioskConditionsScene({ location, refreshTick }) {
               )}
             </div>
           </div>
-
-          {periods && (
-            <div className="kioskForecastRow">
-              {periods.slice(0, 4).map((p) => (
-                <div className="kioskForecastCard" key={p.name}>
-                  <div className="kioskForecastCardHead">
-                    {p.icon && <img className="kioskForecastIcon" src={p.icon} alt="" />}
-                    <div className="kioskForecastName">{p.name}</div>
-                  </div>
-                  <div className="kioskForecastTemp">
-                    {p.temperature}°{p.temperature_unit}
-                  </div>
-                  <div className="kioskForecastText">{p.short_forecast}</div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="kioskConditionsRight">
@@ -269,7 +246,12 @@ function KioskDaysScene({ location, refreshTick }) {
     };
   }, [location.lat, location.lon, refreshTick]);
 
-  const dayCards = (periods || []).filter((p) => p.is_daytime).slice(0, 6);
+  // Keep the first period verbatim (Today, or Tonight if it's already
+  // evening) plus whichever immediately follows it — that's the only way
+  // "Tonight" survives, since Nice Day Forecast (and every period past this
+  // pair) is a daily, daytime-only figure. Everything after that is
+  // daytime-only so a whole week fits without one card per night too.
+  const dayCards = [...(periods || []).slice(0, 2), ...(periods || []).slice(2).filter((p) => p.is_daytime)].slice(0, 8);
 
   return (
     <div className="kioskScene kioskDaysScene">
@@ -280,7 +262,7 @@ function KioskDaysScene({ location, refreshTick }) {
         <div className="kioskDaysGrid">
           {dayCards.map((p) => {
             const date = p.start_time ? p.start_time.slice(0, 10) : null;
-            const niceDay = date ? niceDayByDate?.[date] : null;
+            const niceDay = date && p.is_daytime ? niceDayByDate?.[date] : null;
             return (
               <div className="kioskDayCard" key={p.name}>
                 <div className="kioskDayName">{p.name}</div>

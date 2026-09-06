@@ -489,19 +489,6 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
    uses dark text to stay legible against SPC's light fill colors. */
 .kioskHazardChip[style] { color: #06111f; }
 
-.kioskForecastRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.kioskForecastCard {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-}
-.kioskForecastCardHead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.kioskForecastIcon { width: 32px; height: 32px; flex: 0 0 auto; }
-.kioskForecastName { font-size: 15px; font-weight: 700; }
-.kioskForecastTemp { font-size: 22px; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
-.kioskForecastText { font-size: 13px; color: var(--text); }
-
 /* Coming Days scene: one card per day, pairing NWS's forecast icon/text
    with that same date's Nice Day Forecast score. */
 .kioskDaysGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
