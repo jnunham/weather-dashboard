@@ -179,7 +179,16 @@ async def get_nice_day_forecast(lat: float, lon: float) -> dict:
                         "windspeed_unit": "mph",
                         "precipitation_unit": "inch",
                         "timezone": "auto",
-                        "forecast_days": 7,
+                        # NWS's forecast periods run "Today" through roughly a
+                        # week out counted in *day/night periods*, not
+                        # calendar days — late in the day, "Today" has
+                        # already passed and the visible period list shifts
+                        # to cover one extra calendar date beyond a flat
+                        # 7-day window (e.g. it can include next Sunday when
+                        # today is already Sunday evening). 10 days leaves
+                        # comfortable headroom so every date a forecast card
+                        # might show always has a matching score.
+                        "forecast_days": 10,
                     },
                 )
                 resp.raise_for_status()

@@ -11,6 +11,8 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
+import usStates from "./data/us-states.json";
+
 import { api } from "./api.js";
 
 export function parseLatLon(str) {
@@ -107,6 +109,17 @@ function pointInGeometry(lon, lat, geometry) {
   if (geometry.type === "Polygon") return pointInPolygon(lon, lat, geometry.coordinates);
   if (geometry.type === "MultiPolygon") return geometry.coordinates.some((poly) => pointInPolygon(lon, lat, poly));
   return false;
+}
+
+// Bounding box of whichever US state contains this point — used to declutter
+// the SPC outlook legend to categories actually near the user, wherever they
+// are, rather than hardcoding Michigan. A bbox (not the exact state outline)
+// is deliberately loose: it may occasionally keep a category from a
+// neighboring state, but it will never hide one that's genuinely relevant.
+// Returns null outside the 50 states (nothing to filter against).
+export function findStateBbox(lat, lon) {
+  const state = usStates.features.find((f) => pointInGeometry(lon, lat, f.geometry));
+  return state ? computeGeometryBbox(state.geometry) : null;
 }
 
 // SPC's "nolyr" outlook GeoJSON draws each risk band as its own non-

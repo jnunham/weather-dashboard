@@ -98,6 +98,7 @@ export default function App() {
           <ForecastCard location={location} refreshTick={refreshTick} />
           <AlertsCard location={location} refreshTick={refreshTick} />
           <OutlookCard
+            location={location}
             day={outlookDay}
             hazard={outlookHazard}
             onDayChange={setOutlookDay}

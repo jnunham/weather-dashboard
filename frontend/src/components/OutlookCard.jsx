@@ -11,9 +11,10 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../api.js";
+import { bboxesIntersect, computeGeometryBbox, findStateBbox } from "../utils.js";
 
 const HAZARDS_BY_DAY = {
   1: [
@@ -34,9 +35,17 @@ const HAZARDS_BY_DAY = {
   ],
 };
 
-export default function OutlookCard({ day, hazard, onDayChange, onHazardChange }) {
+export default function OutlookCard({ location, day, hazard, onDayChange, onHazardChange }) {
   const [legend, setLegend] = useState([]);
   const [error, setError] = useState(null);
+
+  // Bounding box of whichever state the user is in — wherever that is, not
+  // hardcoded to Michigan — so the legend only lists categories actually
+  // near them instead of every category present anywhere in the country.
+  const stateBbox = useMemo(
+    () => (location ? findStateBbox(location.lat, location.lon) : null),
+    [location?.lat, location?.lon]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +56,9 @@ export default function OutlookCard({ day, hazard, onDayChange, onHazardChange }
         if (cancelled) return;
         const seen = new Map();
         (data.features || []).forEach((f) => {
+          // No containing state (e.g. a non-US location) or geometry
+          // outside it — leave the legend unfiltered rather than guess.
+          if (stateBbox && !bboxesIntersect(computeGeometryBbox(f.geometry), stateBbox)) return;
           const label = f.properties.LABEL2 || f.properties.LABEL;
           if (label && !seen.has(label)) seen.set(label, f.properties.fill || "#888");
         });
@@ -56,7 +68,7 @@ export default function OutlookCard({ day, hazard, onDayChange, onHazardChange }
     return () => {
       cancelled = true;
     };
-  }, [day, hazard]);
+  }, [day, hazard, stateBbox]);
 
   function handleDayChange(newDay) {
     onDayChange(newDay);
@@ -73,7 +85,9 @@ export default function OutlookCard({ day, hazard, onDayChange, onHazardChange }
         <div className="helpText">
           The Storm Prediction Center's outlook map for organized severe thunderstorms. Categories run low to high:
           Marginal, Slight, Enhanced, Moderate, High. "Categorical" is the overall category; the other tabs break out
-          the odds of a specific hazard (tornado, hail, wind) within 25 miles of any point in the shaded area.
+          the odds of a specific hazard (tornado, hail, wind) within 25 miles of any point in the shaded area. The
+          legend below only lists categories present in or near your state — the map itself still shows the whole
+          country.
         </div>
         <div className="btnRow">
           {[1, 2, 3].map((d) => (
