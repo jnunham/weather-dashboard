@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { alertClass, fetchOutlookBreakdown, fmt, minutesSince, NICE_DAY_COLORS, topAlert } from "../utils.js";
+import { alertClass, fetchOutlookBreakdown, filterNearbyAlerts, fmt, minutesSince, NICE_DAY_COLORS, topAlert } from "../utils.js";
 import MapView from "./MapView.jsx";
 
 const ALL_SCENES = ["map", "conditions", "days", "mds", "afd"];
@@ -66,9 +66,10 @@ function KioskConditionsScene({ location, refreshTick }) {
       .alerts(location.lat, location.lon)
       .then((d) => {
         if (cancelled) return;
-        setAlerts(d.alerts);
+        const nearby = filterNearbyAlerts(d.alerts, location.lat, location.lon);
+        setAlerts(nearby);
         setStateAbbr(d.state);
-        setTopAlertItem(topAlert(d.alerts));
+        setTopAlertItem(topAlert(nearby));
       })
       .catch(() => {
         if (cancelled) return;
@@ -198,7 +199,7 @@ function KioskConditionsScene({ location, refreshTick }) {
           <div className="kioskCompactListBlock">
             <h3>Watches &amp; Warnings{stateAbbr ? ` — ${stateAbbr}` : ""}</h3>
             {alerts === null && <div className="kioskLoading">Loading…</div>}
-            {alerts && alerts.length === 0 && <div className="kioskEmpty">No active alerts.</div>}
+            {alerts && alerts.length === 0 && <div className="kioskEmpty">No active alerts in or near your county.</div>}
             {alerts &&
               alerts.map((a) => (
                 <div className={`kioskCompactCard ${alertClass(a.event)}`} key={a.id}>

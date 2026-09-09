@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { alertClass } from "../utils.js";
+import { alertClass, filterNearbyAlerts } from "../utils.js";
 
 export default function AlertsCard({ location, refreshTick }) {
   const [alerts, setAlerts] = useState(null);
@@ -29,7 +29,7 @@ export default function AlertsCard({ location, refreshTick }) {
       .alerts(location.lat, location.lon)
       .then((d) => {
         if (cancelled) return;
-        setAlerts(d.alerts);
+        setAlerts(filterNearbyAlerts(d.alerts, location.lat, location.lon));
         setState(d.state);
       })
       .catch((err) => !cancelled && setError(err.message));
@@ -46,7 +46,7 @@ export default function AlertsCard({ location, refreshTick }) {
       <div className="cardBody">
         {error && <div className="errorText">{error}</div>}
         {!error && !alerts && "Loading…"}
-        {alerts && alerts.length === 0 && <div className="muted">No active alerts{state ? ` in ${state}` : ""}.</div>}
+        {alerts && alerts.length === 0 && <div className="muted">No active alerts in or near your county.</div>}
         {alerts &&
           alerts.map((a) => (
             <div className={`listItem ${alertClass(a.event)}`} key={a.id}>

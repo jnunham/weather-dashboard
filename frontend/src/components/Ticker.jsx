@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { filterNearbyAlerts } from "../utils.js";
 
 const POLL_INTERVAL_MS = 60 * 1000;
 
@@ -26,7 +27,6 @@ function formatAlert(a) {
 
 export default function Ticker({ location, refreshTick }) {
   const [alerts, setAlerts] = useState([]);
-  const [stateAbbr, setStateAbbr] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
   // Reset immediately on a real location change so stale alerts from the
@@ -44,8 +44,7 @@ export default function Ticker({ location, refreshTick }) {
       try {
         const data = await api.alerts(location.lat, location.lon);
         if (!cancelled) {
-          setAlerts(data.alerts);
-          setStateAbbr(data.state);
+          setAlerts(filterNearbyAlerts(data.alerts, location.lat, location.lon));
           setLoaded(true);
         }
       } catch {
@@ -69,7 +68,7 @@ export default function Ticker({ location, refreshTick }) {
     return (
       <div className="ticker noAlerts">
         <div className="ticker__item" style={{ paddingLeft: 16 }}>
-          No active watches or warnings{stateAbbr ? ` in ${stateAbbr}` : ` for ${location.label}`}.
+          No active watches or warnings in or near {location.label}.
         </div>
       </div>
     );

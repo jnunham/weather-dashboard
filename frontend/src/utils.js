@@ -11,6 +11,7 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
+import usCounties from "./data/us-counties.json";
 import usStates from "./data/us-states.json";
 
 import { api } from "./api.js";
@@ -120,6 +121,40 @@ function pointInGeometry(lon, lat, geometry) {
 export function findStateBbox(lat, lon) {
   const state = usStates.features.find((f) => pointInGeometry(lon, lat, f.geometry));
   return state ? computeGeometryBbox(state.geometry) : null;
+}
+
+// Margin (degrees) added around the user's own county bbox to approximate
+// "bordering counties" — not real adjacency topology (no county-adjacency
+// graph on hand), just a bbox loose enough to reliably catch actual
+// neighbors without reaching clear across a state. ~0.6° is roughly 30-40
+// miles at US latitudes.
+const ADJACENT_COUNTY_DEGREES = 0.6;
+
+// Narrows a statewide NWS alert feed down to "your county, plus counties
+// close enough to actually be upstream of you" — a warning clear across the
+// state technically shares a UGC state code but isn't upstream of anyone
+// near here. Alerts already flagged local (exact county UGC match, done
+// server-side) always pass through; others are kept only if their own
+// coverage polygon reaches into the buffered zone around the user's county.
+// Alerts with no polygon (some advisory types omit one) can't be tested
+// geometrically, so they're dropped unless already local — erring toward
+// less noise rather than guessing.
+export function filterNearbyAlerts(alerts, lat, lon) {
+  if (lat == null || lon == null) return alerts;
+  const county = usCounties.features.find((f) => pointInGeometry(lon, lat, f.geometry));
+  if (!county) return alerts;
+  const countyBbox = computeGeometryBbox(county.geometry);
+  const nearbyBbox = {
+    minLon: countyBbox.minLon - ADJACENT_COUNTY_DEGREES,
+    minLat: countyBbox.minLat - ADJACENT_COUNTY_DEGREES,
+    maxLon: countyBbox.maxLon + ADJACENT_COUNTY_DEGREES,
+    maxLat: countyBbox.maxLat + ADJACENT_COUNTY_DEGREES,
+  };
+  return alerts.filter((a) => {
+    if (a.is_local) return true;
+    if (!a.geometry) return false;
+    return bboxesIntersect(computeGeometryBbox(a.geometry), nearbyBbox);
+  });
 }
 
 // SPC's "nolyr" outlook GeoJSON draws each risk band as its own non-
