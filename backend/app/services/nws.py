@@ -179,10 +179,12 @@ async def get_hourly_forecast(lat: float, lon: float) -> dict:
         return await _get_json(point["forecastHourly"])
 
     data = await cached(f"forecast-hourly:{point['forecastHourly']}", 900, fetch)
-    # 48 hours is two full days — plenty for an expandable hour-by-hour view
-    # without hauling in NWS's full ~6.5-day hourly window (156 periods) for
-    # a card nobody's going to scroll that far through.
-    periods = data["properties"]["periods"][:48]
+    # NWS's hourly product only actually spans ~6.5 days (156 hourly
+    # periods) to begin with — take the whole thing so every day in the
+    # 7-day forecast card can expand its own hours (the last day may end up
+    # with a partial or empty set; that's a real limit of the data, not
+    # something to work around here).
+    periods = data["properties"]["periods"]
     return {
         "periods": [
             {
