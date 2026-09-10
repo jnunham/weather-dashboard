@@ -39,6 +39,11 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [outlookDay, setOutlookDay] = useState("1");
   const [outlookHazard, setOutlookHazard] = useState("cat");
+  // Collapsed by default: MapView isn't mounted until this is true, so
+  // Leaflet init, the radar frame fetch, and every radar tile request are
+  // skipped entirely on load — not just visually hidden, actually not
+  // requested — until someone asks to see the map.
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -85,13 +90,20 @@ export default function App() {
       <TopBar location={location} onLocationChange={handleLocationChange} lastUpdated={lastUpdated} />
       <Ticker location={location} refreshTick={refreshTick} />
       <main className="layout">
-        <MapView
-          location={location}
-          onMapClick={(lat, lon) => handleLocationChange({ lat, lon, label: `${lat.toFixed(3)}, ${lon.toFixed(3)}` })}
-          outlookDay={outlookDay}
-          outlookHazard={outlookHazard}
-          refreshTick={refreshTick}
-        />
+        <div className="mapSection">
+          <button type="button" className="mapToggle" onClick={() => setShowMap((v) => !v)}>
+            {showMap ? "▾ Hide Map & Radar" : "▸ Show Map & Radar"}
+          </button>
+          {showMap && (
+            <MapView
+              location={location}
+              onMapClick={(lat, lon) => handleLocationChange({ lat, lon, label: `${lat.toFixed(3)}, ${lon.toFixed(3)}` })}
+              outlookDay={outlookDay}
+              outlookHazard={outlookHazard}
+              refreshTick={refreshTick}
+            />
+          )}
+        </div>
         <aside className="panel">
           <CurrentConditionsCard location={location} refreshTick={refreshTick} />
           <LocationRiskCard location={location} day={outlookDay} />
