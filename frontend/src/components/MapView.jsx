@@ -93,6 +93,10 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
   const [radarIndex, setRadarIndex] = useState(0);
   const [radarTimeLabel, setRadarTimeLabel] = useState("—");
   const [radarPlaying, setRadarPlaying] = useState(false);
+  // Playback waits for this before actually looping — see the radar-frame
+  // effect below. Otherwise autoplay (kiosk) starts animating through tiles
+  // that haven't loaded yet, which is exactly the "lags on startup" symptom.
+  const [radarReady, setRadarReady] = useState(false);
   const [showRadar, setShowRadar] = useState(true);
   const [showAlerts, setShowAlerts] = useState(true);
   const [showOutlook, setShowOutlook] = useState(true);
@@ -301,16 +305,15 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
   // Radar frame list.
   useEffect(() => {
     let cancelled = false;
+    let readyFallback;
 
     async function load() {
       try {
         const data = await getRadarFrames();
         if (cancelled) return;
         const map = mapRef.current;
-
-        // Drop any previously prefetched layers before replacing them.
-        (radarRef.current.layers || []).forEach((l) => map && map.hasLayer(l) && map.removeLayer(l));
-        (radarRef.current.timers || []).forEach((t) => clearTimeout(t));
+        const rs = radarRef.current;
+        const isFirstLoad = rs.frames.length === 0;
 
         // Each tile layer needs dozens of individual tile requests for the
         // current viewport — adding every frame (previously ~13-16) to the
@@ -325,11 +328,20 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
         const frames = [...pastFrames, ...(data.radar.nowcast || [])];
         const initialIndex = pastFrames.length - 1;
 
-        radarRef.current.frames = frames;
-        radarRef.current.currentLayer = null;
-        radarRef.current.timers = [];
-        radarRef.current.layers = frames.map((frame) =>
-          L.tileLayer(`${API_BASE}/api/radar/tile${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+        // RainViewer's frame list mostly just slides forward every refresh
+        // (the same timestamps, plus one new one) — rebuilding every tile
+        // layer from scratch each time threw away tiles that were already
+        // loaded and made the radar stutter on every refresh, not just on
+        // startup. Reuse a layer by its frame path when the new list still
+        // includes it; only genuinely new frames get a fresh layer.
+        const oldLayerByPath = new Map(rs.frames.map((f, i) => [f.path, rs.layers[i]]));
+        const layers = frames.map((frame) => {
+          const existing = oldLayerByPath.get(frame.path);
+          if (existing) {
+            oldLayerByPath.delete(frame.path);
+            return existing;
+          }
+          return L.tileLayer(`${API_BASE}/api/radar/tile${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
             opacity: 0,
             zIndex: 5,
             // RainViewer's radar mosaic only actually renders up to zoom 7 —
@@ -341,8 +353,16 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
             // to keep working for the state-outline/alert/outlook layers.
             maxNativeZoom: 7,
             maxZoom: 19,
-          })
-        );
+          });
+        });
+        // Whatever's left in oldLayerByPath fell out of the window (aged
+        // past MAX_PAST_FRAMES) and isn't reused above — drop it for real.
+        (radarRef.current.timers || []).forEach((t) => clearTimeout(t));
+        oldLayerByPath.forEach((layer) => map && map.hasLayer(layer) && map.removeLayer(layer));
+
+        rs.frames = frames;
+        rs.layers = layers;
+        rs.timers = [];
 
         setRadarFrameCount(frames.length);
         // The current frame loads immediately — it's the one actually
@@ -350,21 +370,41 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
         // apart by distance from "now", so playback has usually caught up
         // to a frame's tiles by the time the loop reaches it.
         showRadarFrame(initialIndex);
-        radarRef.current.layers.forEach((layer, i) => {
+        layers.forEach((layer, i) => {
           if (i === initialIndex) return;
+          if (map && map.hasLayer(layer)) return; // reused and already loaded/loading
           const timer = setTimeout(() => {
             if (mapRef.current && !mapRef.current.hasLayer(layer)) layer.addTo(mapRef.current);
           }, Math.abs(i - initialIndex) * 200);
-          radarRef.current.timers.push(timer);
+          rs.timers.push(timer);
         });
+
+        // Only gate playback start on the very first load — later refreshes
+        // reuse already-loaded layers, so there's nothing new to wait on.
+        if (isFirstLoad && !radarReady) {
+          let pending = layers.length;
+          const markReady = () => {
+            pending -= 1;
+            if (pending <= 0) {
+              clearTimeout(readyFallback);
+              setRadarReady(true);
+            }
+          };
+          layers.forEach((layer) => layer.once("load", markReady));
+          // Cap the wait — a slow/flaky connection shouldn't hold playback
+          // hostage forever, just long enough to usually catch up.
+          readyFallback = setTimeout(() => setRadarReady(true), 4000);
+        }
       } catch {
         setRadarTimeLabel("Radar unavailable");
+        setRadarReady(true);
       }
     }
 
     load();
     return () => {
       cancelled = true;
+      clearTimeout(readyFallback);
       (radarRef.current.timers || []).forEach((t) => clearTimeout(t));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -372,7 +412,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
 
   // Radar play/pause loop.
   useEffect(() => {
-    if (!radarPlaying) return undefined;
+    if (!radarPlaying || !radarReady) return undefined;
     const id = setInterval(() => {
       const rs = radarRef.current;
       if (!rs.frames.length) return;
@@ -380,7 +420,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     }, 600);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radarPlaying]);
+  }, [radarPlaying, radarReady]);
 
   // Layer visibility toggles.
   useEffect(() => {

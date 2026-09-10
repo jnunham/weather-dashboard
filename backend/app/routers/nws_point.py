@@ -28,6 +28,11 @@ async def forecast(lat: float = Query(...), lon: float = Query(...)):
     return await nws.get_forecast(lat, lon)
 
 
+@router.get("/forecast/hourly")
+async def forecast_hourly(lat: float = Query(...), lon: float = Query(...)):
+    return await nws.get_hourly_forecast(lat, lon)
+
+
 @router.get("/afd")
 async def afd(lat: float = Query(...), lon: float = Query(...)):
     return await nws.get_afd(lat, lon)

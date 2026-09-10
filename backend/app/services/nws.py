@@ -172,6 +172,35 @@ async def get_forecast(lat: float, lon: float) -> dict:
     }
 
 
+async def get_hourly_forecast(lat: float, lon: float) -> dict:
+    point = await get_point_meta(lat, lon)
+
+    async def fetch():
+        return await _get_json(point["forecastHourly"])
+
+    data = await cached(f"forecast-hourly:{point['forecastHourly']}", 900, fetch)
+    # 48 hours is two full days — plenty for an expandable hour-by-hour view
+    # without hauling in NWS's full ~6.5-day hourly window (156 periods) for
+    # a card nobody's going to scroll that far through.
+    periods = data["properties"]["periods"][:48]
+    return {
+        "periods": [
+            {
+                "start_time": p.get("startTime"),
+                "is_daytime": p.get("isDaytime"),
+                "temperature": p["temperature"],
+                "temperature_unit": p["temperatureUnit"],
+                "short_forecast": p["shortForecast"],
+                "icon": p.get("icon"),
+                "precip_probability_pct": (p.get("probabilityOfPrecipitation") or {}).get("value"),
+                "wind_speed": p.get("windSpeed"),
+                "wind_direction": p.get("windDirection"),
+            }
+            for p in periods
+        ]
+    }
+
+
 async def get_afd(lat: float, lon: float) -> dict:
     point = await get_point_meta(lat, lon)
     office_id = point["forecastOffice"].rstrip("/").split("/")[-1]

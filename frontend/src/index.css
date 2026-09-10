@@ -58,6 +58,10 @@ body { background: var(--bg); color: var(--text); }
   padding: 6px 10px;
   border-radius: 6px;
   width: 220px;
+  /* Below 16px, iOS Safari zooms the whole page in when this gets focus —
+     not a layout bug, a built-in accessibility behavior for small text
+     inputs. 16px is the threshold that turns it off. */
+  font-size: 16px;
 }
 
 .locationForm button {
@@ -199,6 +203,35 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .forecastIcon { width: 36px; height: 36px; flex: 0 0 auto; }
 .forecastPeriodBody { min-width: 0; }
 
+.expandToggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 8px 0 0 0;
+  width: 100%;
+  text-align: left;
+}
+
+.hourlyForecast { margin-top: 6px; }
+.hourlyList { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--border); }
+.hourlyRow {
+  display: grid;
+  grid-template-columns: 34px 22px 34px 32px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.hourlyRow:last-child { border-bottom: none; }
+.hourlyTime { color: var(--muted); }
+.hourlyIcon { width: 20px; height: 20px; }
+.hourlyTemp { color: var(--accent); font-weight: 600; }
+.hourlyPrecip { color: var(--watch); font-size: 10px; }
+.hourlyText { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .listItem { padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
 .listItem:last-child { border-bottom: none; }
 .listItem .title { font-weight: 600; }
@@ -311,6 +344,9 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
   padding: 8px 10px;
   border-radius: 6px;
   margin-bottom: 10px;
+  /* See .locationForm input — same iOS Safari auto-zoom threshold, and this
+     one autofocuses on load, so it's the one most likely to be noticed. */
+  font-size: 16px;
 }
 
 .modal .primaryButton {

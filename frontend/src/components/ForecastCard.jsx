@@ -16,6 +16,10 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { NICE_DAY_COLORS } from "../utils.js";
 
+function formatHour(startTime) {
+  return new Date(startTime).toLocaleTimeString([], { hour: "numeric" });
+}
+
 // One row per upcoming day (daytime periods only — nighttime detail gave way
 // to covering the whole week), each paired by date with that day's Nice Day
 // Forecast score. Previously two separate cards; folded together since a
@@ -24,6 +28,9 @@ export default function ForecastCard({ location, refreshTick }) {
   const [periods, setPeriods] = useState(null);
   const [niceDayByDate, setNiceDayByDate] = useState(null);
   const [error, setError] = useState(null);
+  const [showHourly, setShowHourly] = useState(false);
+  const [hourly, setHourly] = useState(null);
+  const [hourlyError, setHourlyError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +50,21 @@ export default function ForecastCard({ location, refreshTick }) {
       cancelled = true;
     };
   }, [location.lat, location.lon, refreshTick]);
+
+  // Fetched lazily — only once someone actually opens the hourly view, not
+  // on every page load, since most visits never need hour-by-hour detail.
+  useEffect(() => {
+    if (!showHourly) return undefined;
+    let cancelled = false;
+    setHourlyError(null);
+    api
+      .hourlyForecast(location.lat, location.lon)
+      .then((d) => !cancelled && setHourly(d.periods))
+      .catch((err) => !cancelled && setHourlyError(err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [showHourly, location.lat, location.lon, refreshTick]);
 
   const days = (periods || []).filter((p) => p.is_daytime).slice(0, 7);
 
@@ -73,6 +95,36 @@ export default function ForecastCard({ location, refreshTick }) {
               </div>
             );
           })}
+
+        {periods && (
+          <button type="button" className="expandToggle" onClick={() => setShowHourly((v) => !v)}>
+            {showHourly ? "▾ Hide hourly forecast" : "▸ View hourly forecast"}
+          </button>
+        )}
+
+        {showHourly && (
+          <div className="hourlyForecast">
+            {hourlyError && <div className="errorText">{hourlyError}</div>}
+            {!hourlyError && !hourly && <div className="muted">Loading…</div>}
+            {hourly && (
+              <div className="hourlyList">
+                {hourly.map((h) => (
+                  <div className="hourlyRow" key={h.start_time}>
+                    <div className="hourlyTime">{formatHour(h.start_time)}</div>
+                    {h.icon && <img className="hourlyIcon" src={h.icon} alt="" />}
+                    <div className="hourlyTemp">
+                      {h.temperature}°{h.temperature_unit}
+                    </div>
+                    <div className="hourlyPrecip">
+                      {h.precip_probability_pct != null && h.precip_probability_pct > 0 ? `${h.precip_probability_pct}%` : ""}
+                    </div>
+                    <div className="hourlyText">{h.short_forecast}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

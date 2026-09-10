@@ -57,6 +57,7 @@ async function getJson(path, params = {}) {
 export const api = {
   conditions: (lat, lon) => getJson("/api/conditions", { lat, lon }),
   forecast: (lat, lon) => getJson("/api/forecast", { lat, lon }),
+  hourlyForecast: (lat, lon) => getJson("/api/forecast/hourly", { lat, lon }),
   afd: (lat, lon) => getJson("/api/afd", { lat, lon }),
   alerts: (lat, lon) => getJson("/api/alerts", { lat, lon }),
   outlook: (day, hazard) => getJson("/api/outlook", { day, hazard }),

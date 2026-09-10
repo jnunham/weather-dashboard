@@ -49,12 +49,27 @@ export default function LocationPrompt({ onConfirm }) {
       setStatus("Geolocation isn't available in this browser");
       return;
     }
+    // Browsers only allow the geolocation API on a "secure context" — HTTPS,
+    // or localhost. Over plain http:// on a LAN address (the common case for
+    // this app's --lan mode without a reverse-proxied TLS cert in front of
+    // it), getCurrentPosition fails immediately with no permission prompt at
+    // all, which otherwise just looks like a silent, unexplained failure.
+    if (!window.isSecureContext) {
+      setStatus("Location access needs HTTPS — this page is loaded over plain HTTP. Search by city or ZIP instead.");
+      return;
+    }
     setBusy(true);
     setStatus("Locating…");
     navigator.geolocation.getCurrentPosition(
       (pos) => onConfirm({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: "My location" }),
-      () => {
-        setStatus("Could not get your location");
+      (err) => {
+        const reason =
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission was denied"
+            : err.code === err.TIMEOUT
+              ? "Location request timed out"
+              : "Could not get your location";
+        setStatus(`${reason} — search by city or ZIP instead.`);
         setBusy(false);
       }
     );
