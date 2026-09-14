@@ -98,19 +98,31 @@ def _humidity_score(rh_pct: float) -> float:
     return max(0.0, 100 - (rh_pct - 60) * 2.5)
 
 
-def _label(score: float) -> str:
+def _label(score: float, precip_prob: float) -> str:
     if score >= 85:
-        return "Great"
-    if score >= 70:
-        return "Good"
-    if score >= 55:
-        return "Fair"
-    if score >= 40:
-        return "Meh"
-    return "Not Great"
+        label = "Great"
+    elif score >= 70:
+        label = "Good"
+    elif score >= 55:
+        label = "Fair"
+    elif score >= 40:
+        label = "Meh"
+    else:
+        label = "Not Great"
+
+    # A coin-flip-or-worse chance of rain shouldn't round up to "Good"/
+    # "Great" just because temperature, wind, and sun happened to average
+    # out pleasant — the other four factors together are only 75% of the
+    # weighted score, which isn't always enough to keep a >50% rain chance
+    # from getting outvoted. NWS's own PoP wording treats >50% as "Chance"
+    # bordering "Likely", which reads as more rain than not; the label
+    # shouldn't disagree with that just because the math still net positive.
+    if precip_prob > 50 and label in ("Good", "Great"):
+        label = "Fair"
+    return label
 
 
-def _reasons(apparent_f: float, components: dict) -> list[str]:
+def _reasons(apparent_f: float, components: dict, precip_prob: float) -> list[str]:
     """Short plain-language notes for whichever factors dragged the score
     down, worst first — so the card can say *why*, not just show a number."""
     candidates = []
@@ -125,7 +137,13 @@ def _reasons(apparent_f: float, components: dict) -> list[str]:
     if components["humidity"] < 60:
         candidates.append((components["humidity"], "humid"))
     candidates.sort(key=lambda c: c[0])
-    return [note for _, note in candidates[:2]]
+    reasons = [note for _, note in candidates[:2]]
+    # If the >50% rain chance is what capped the label (see _label), make
+    # sure that's actually visible instead of only ever showing whichever
+    # two factors happened to score lowest.
+    if precip_prob > 50 and "rain likely" not in reasons:
+        reasons = ["rain likely", *reasons[:1]]
+    return reasons
 
 
 def _score_day(i: int, daily: dict) -> Optional[dict]:
@@ -152,12 +170,13 @@ def _score_day(i: int, daily: dict) -> Optional[dict]:
         "humidity": _humidity_score(humidity_pct if humidity_pct is not None else 50),
     }
     score = round(sum(WEIGHTS[k] * v for k, v in components.items()))
+    precip_prob_val = precip_prob or 0
 
     return {
         "date": daily["time"][i],
         "score": score,
-        "label": _label(score),
-        "reasons": _reasons(apparent_f, components),
+        "label": _label(score, precip_prob_val),
+        "reasons": _reasons(apparent_f, components, precip_prob_val),
         "high_f": round(high_f),
         "precip_probability_pct": round(precip_prob) if precip_prob is not None else None,
         "wind_mph": round(wind_mph) if wind_mph is not None else None,
