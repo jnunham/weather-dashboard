@@ -458,7 +458,11 @@ export default function KioskView({ location }) {
       </header>
 
       <div className="kioskBody">
-        {scene === "map" && (
+        {/* Always mounted, just hidden — unmounting on every scene cycle
+            (every ~2 minutes by default) meant the radar had to re-warm up
+            from a cold start almost every time it came back around, which
+            is what "still laggy" on repeat viewing actually was. */}
+        <div className={`kioskMapWrap${scene === "map" ? "" : " kioskMapHidden"}`}>
           <MapView
             location={location}
             onMapClick={() => {}}
@@ -466,8 +470,9 @@ export default function KioskView({ location }) {
             outlookHazard="cat"
             refreshTick={refreshTick}
             autoPlayRadar
+            active={scene === "map"}
           />
-        )}
+        </div>
         {scene === "conditions" && <KioskConditionsScene location={location} refreshTick={refreshTick} />}
         {scene === "days" && <KioskDaysScene location={location} refreshTick={refreshTick} />}
         {scene === "mds" && <KioskMdScene location={location} refreshTick={refreshTick} />}

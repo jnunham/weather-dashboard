@@ -80,7 +80,7 @@ function bboxIntersectsBounds(bbox, bounds) {
 // in it would be unreadable clutter, so counties simply don't render yet.
 const COUNTY_MIN_ZOOM = 7;
 
-export default function MapView({ location, onMapClick, outlookDay, outlookHazard, refreshTick, autoPlayRadar = false }) {
+export default function MapView({ location, onMapClick, outlookDay, outlookHazard, refreshTick, autoPlayRadar = false, active = true }) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -163,6 +163,17 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Kiosk mode keeps this component mounted permanently and just hides it
+  // (display: none) while another scene is showing, instead of unmounting
+  // it — that's what makes staying "warmed up" across scene cycles possible
+  // at all. But Leaflet measures its container's size when told to redraw,
+  // and a display:none element measures as 0×0, so coming back into view
+  // needs an explicit nudge to recompute real dimensions before anything
+  // drawn while hidden (or sized wrong right after) looks right again.
+  useEffect(() => {
+    if (active && mapRef.current) mapRef.current.invalidateSize();
+  }, [active]);
 
   // Recenter on location change.
   useEffect(() => {

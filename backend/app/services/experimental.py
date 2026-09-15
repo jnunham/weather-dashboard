@@ -26,6 +26,8 @@ doesn't surface directly. Docs: https://open-meteo.com/en/docs
 
 from __future__ import annotations
 
+import asyncio
+import re
 from typing import Optional
 
 import httpx
@@ -33,6 +35,7 @@ from fastapi import HTTPException
 
 from ..cache import cached
 from ..config import USER_AGENT
+from . import nws
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 HEADERS = {"User-Agent": USER_AGENT}
@@ -98,7 +101,22 @@ def _humidity_score(rh_pct: float) -> float:
     return max(0.0, 100 - (rh_pct - 60) * 2.5)
 
 
-def _label(score: float, precip_prob: float) -> str:
+# NWS's own forecaster-written text uses a standardized probability-of-
+# precipitation vocabulary: "Slight Chance" (~20%), "Chance" (~30-50%),
+# "Likely" (~60-70%), no qualifier at all (~80-100%). Open-Meteo's own
+# precipitation_probability_max is a *different model's* number for the same
+# day and can legitimately disagree — a day can read "57%" from Open-Meteo
+# while NWS's own forecaster confidently writes "Rain Likely". Checking both
+# independently means the label can't round up to "Good" on the model's
+# number alone while NWS's own text is actively warning otherwise.
+_LIKELY_RE = re.compile(r"\blikely\b", re.IGNORECASE)
+
+
+def _nws_signals_likely_rain(short_forecast: Optional[str]) -> bool:
+    return bool(short_forecast) and bool(_LIKELY_RE.search(short_forecast))
+
+
+def _label(score: float, precip_prob: float, nws_likely: bool) -> str:
     if score >= 85:
         label = "Great"
     elif score >= 70:
@@ -110,19 +128,17 @@ def _label(score: float, precip_prob: float) -> str:
     else:
         label = "Not Great"
 
-    # A coin-flip-or-worse chance of rain shouldn't round up to "Good"/
-    # "Great" just because temperature, wind, and sun happened to average
-    # out pleasant — the other four factors together are only 75% of the
-    # weighted score, which isn't always enough to keep a >50% rain chance
-    # from getting outvoted. NWS's own PoP wording treats >50% as "Chance"
-    # bordering "Likely", which reads as more rain than not; the label
-    # shouldn't disagree with that just because the math still net positive.
-    if precip_prob > 50 and label in ("Good", "Great"):
+    # A coin-flip-or-worse chance of rain — by either source's own number —
+    # shouldn't round up to "Good"/"Great" just because temperature, wind,
+    # and sun happened to average out pleasant. The other four factors
+    # together are only 75% of the weighted score, which isn't always enough
+    # to keep a real rain signal from getting outvoted by a nice afternoon.
+    if (precip_prob > 50 or nws_likely) and label in ("Good", "Great"):
         label = "Fair"
     return label
 
 
-def _reasons(apparent_f: float, components: dict, precip_prob: float) -> list[str]:
+def _reasons(apparent_f: float, components: dict, precip_prob: float, nws_likely: bool) -> list[str]:
     """Short plain-language notes for whichever factors dragged the score
     down, worst first — so the card can say *why*, not just show a number."""
     candidates = []
@@ -138,15 +154,15 @@ def _reasons(apparent_f: float, components: dict, precip_prob: float) -> list[st
         candidates.append((components["humidity"], "humid"))
     candidates.sort(key=lambda c: c[0])
     reasons = [note for _, note in candidates[:2]]
-    # If the >50% rain chance is what capped the label (see _label), make
-    # sure that's actually visible instead of only ever showing whichever
-    # two factors happened to score lowest.
-    if precip_prob > 50 and "rain likely" not in reasons:
+    # If a >50% rain chance (from either source) is what capped the label
+    # (see _label), make sure that's actually visible instead of only ever
+    # showing whichever two factors happened to score lowest.
+    if (precip_prob > 50 or nws_likely) and "rain likely" not in reasons:
         reasons = ["rain likely", *reasons[:1]]
     return reasons
 
 
-def _score_day(i: int, daily: dict) -> Optional[dict]:
+def _score_day(i: int, daily: dict, nws_short_forecast: Optional[str] = None) -> Optional[dict]:
     try:
         apparent_f = daily["apparent_temperature_max"][i]
         high_f = daily["temperature_2m_max"][i]
@@ -171,12 +187,13 @@ def _score_day(i: int, daily: dict) -> Optional[dict]:
     }
     score = round(sum(WEIGHTS[k] * v for k, v in components.items()))
     precip_prob_val = precip_prob or 0
+    nws_likely = _nws_signals_likely_rain(nws_short_forecast)
 
     return {
         "date": daily["time"][i],
         "score": score,
-        "label": _label(score, precip_prob_val),
-        "reasons": _reasons(apparent_f, components, precip_prob_val),
+        "label": _label(score, precip_prob_val, nws_likely),
+        "reasons": _reasons(apparent_f, components, precip_prob_val, nws_likely),
         "high_f": round(high_f),
         "precip_probability_pct": round(precip_prob) if precip_prob is not None else None,
         "wind_mph": round(wind_mph) if wind_mph is not None else None,
@@ -217,9 +234,32 @@ async def get_nice_day_forecast(lat: float, lon: float) -> dict:
                 raise HTTPException(502, "Could not reach the model guidance service") from exc
             return resp.json()
 
+    async def fetch_nws_text_by_date() -> dict:
+        # Best-effort: NWS coverage-area failures, non-US locations, or a
+        # transient upstream error should degrade to "no cross-check"
+        # rather than take the whole Nice Day Forecast down over a feature
+        # that's meant to be a second opinion, not a dependency.
+        try:
+            forecast = await nws.get_forecast(lat, lon)
+        except Exception:
+            return {}
+        by_date = {}
+        for p in forecast.get("periods", []):
+            if not p.get("is_daytime"):
+                continue
+            date = (p.get("start_time") or "")[:10]
+            if date:
+                by_date[date] = p.get("short_forecast")
+        return by_date
+
     # 30 min TTL: model runs update every few hours, so this just avoids
-    # refetching on every dashboard refresh tick.
-    data = await cached(f"nice-day:{lat:.4f},{lon:.4f}", 1800, fetch)
+    # refetching on every dashboard refresh tick. The NWS text lookup has
+    # its own cache (nws.get_forecast), so it's fetched fresh here each
+    # time but rarely actually hits the network.
+    data, nws_text_by_date = await asyncio.gather(
+        cached(f"nice-day:{lat:.4f},{lon:.4f}", 1800, fetch),
+        fetch_nws_text_by_date(),
+    )
     daily = data.get("daily") or {}
-    days = [_score_day(i, daily) for i in range(len(daily.get("time", [])))]
+    days = [_score_day(i, daily, nws_text_by_date.get(daily["time"][i])) for i in range(len(daily.get("time", [])))]
     return {"days": [d for d in days if d is not None]}
