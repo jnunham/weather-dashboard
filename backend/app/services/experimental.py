@@ -105,18 +105,44 @@ def _humidity_score(rh_pct: float) -> float:
 # precipitation vocabulary: "Slight Chance" (~20%), "Chance" (~30-50%),
 # "Likely" (~60-70%), no qualifier at all (~80-100%). Open-Meteo's own
 # precipitation_probability_max is a *different model's* number for the same
-# day and can legitimately disagree — a day can read "57%" from Open-Meteo
-# while NWS's own forecaster confidently writes "Rain Likely". Checking both
-# independently means the label can't round up to "Good" on the model's
-# number alone while NWS's own text is actively warning otherwise.
+# day and can legitimately disagree — a day can read "28%" from Open-Meteo
+# while NWS's own forecaster writes "Chance Showers And Thunderstorms".
+# Checking both catches cases the raw probability number alone misses.
 _LIKELY_RE = re.compile(r"\blikely\b", re.IGNORECASE)
+_THUNDER_RE = re.compile(r"\bthunderstorm", re.IGNORECASE)
+
+_LABEL_ORDER = ["Not Great", "Meh", "Fair", "Good", "Great"]
 
 
-def _nws_signals_likely_rain(short_forecast: Optional[str]) -> bool:
-    return bool(short_forecast) and bool(_LIKELY_RE.search(short_forecast))
+def _cap_label(label: str, ceiling: str) -> str:
+    return ceiling if _LABEL_ORDER.index(label) > _LABEL_ORDER.index(ceiling) else label
 
 
-def _label(score: float, precip_prob: float, nws_likely: bool) -> str:
+def _rain_severity(precip_prob: float, precip_sum_in: float, nws_text: str) -> Optional[str]:
+    """How much a day's rain chances should hold back its label, independent
+    of the plain weighted score — a low *probability* can still mean a real
+    rain event (28% chance of 1.5") that a percentage-only rule would miss
+    entirely, and thunderstorms carry lightning/gust/hail risk a same-
+    probability drizzle doesn't. Two tiers, worse wins:
+      "severe"   — thunderstorms mentioned, a substantial rain total (>1"),
+                   or a high probability (>=70%). Caps at "Meh": a day with
+                   real storm potential shouldn't read as good news even if
+                   temperature/wind/sun happened to average out pleasant.
+      "moderate" — NWS says "likely", a meaningful rain total (>0.5"), or a
+                   coin-flip-or-worse probability (>=40%). Caps at "Fair".
+    """
+    text = (nws_text or "").lower()
+    has_thunder = bool(_THUNDER_RE.search(text))
+    has_likely = bool(_LIKELY_RE.search(text))
+
+    if has_thunder or precip_sum_in > 1.0 or precip_prob >= 70:
+        return "severe"
+    if has_likely or precip_sum_in > 0.5 or precip_prob >= 40:
+        return "moderate"
+    return None
+
+
+def _label(score: float, severity: Optional[str]) -> str:
     if score >= 85:
         label = "Great"
     elif score >= 70:
@@ -128,17 +154,14 @@ def _label(score: float, precip_prob: float, nws_likely: bool) -> str:
     else:
         label = "Not Great"
 
-    # A coin-flip-or-worse chance of rain — by either source's own number —
-    # shouldn't round up to "Good"/"Great" just because temperature, wind,
-    # and sun happened to average out pleasant. The other four factors
-    # together are only 75% of the weighted score, which isn't always enough
-    # to keep a real rain signal from getting outvoted by a nice afternoon.
-    if (precip_prob > 50 or nws_likely) and label in ("Good", "Great"):
-        label = "Fair"
+    if severity == "severe":
+        label = _cap_label(label, "Meh")
+    elif severity == "moderate":
+        label = _cap_label(label, "Fair")
     return label
 
 
-def _reasons(apparent_f: float, components: dict, precip_prob: float, nws_likely: bool) -> list[str]:
+def _reasons(apparent_f: float, components: dict, severity: Optional[str], has_thunder: bool) -> list[str]:
     """Short plain-language notes for whichever factors dragged the score
     down, worst first — so the card can say *why*, not just show a number."""
     candidates = []
@@ -154,15 +177,17 @@ def _reasons(apparent_f: float, components: dict, precip_prob: float, nws_likely
         candidates.append((components["humidity"], "humid"))
     candidates.sort(key=lambda c: c[0])
     reasons = [note for _, note in candidates[:2]]
-    # If a >50% rain chance (from either source) is what capped the label
-    # (see _label), make sure that's actually visible instead of only ever
-    # showing whichever two factors happened to score lowest.
-    if (precip_prob > 50 or nws_likely) and "rain likely" not in reasons:
-        reasons = ["rain likely", *reasons[:1]]
+    # If rain severity is what capped the label (see _label), make sure
+    # that's actually visible instead of only ever showing whichever two
+    # factors happened to score lowest — and say "thunderstorms" specifically
+    # when that's the actual reason, not just generic rain.
+    top_reason = "thunderstorms possible" if has_thunder else "rain likely"
+    if severity and top_reason not in reasons:
+        reasons = [top_reason, *[r for r in reasons if r != "rain likely"][:1]]
     return reasons
 
 
-def _score_day(i: int, daily: dict, nws_short_forecast: Optional[str] = None) -> Optional[dict]:
+def _score_day(i: int, daily: dict, nws_text_for_date: Optional[str] = None) -> Optional[dict]:
     try:
         apparent_f = daily["apparent_temperature_max"][i]
         high_f = daily["temperature_2m_max"][i]
@@ -187,13 +212,15 @@ def _score_day(i: int, daily: dict, nws_short_forecast: Optional[str] = None) ->
     }
     score = round(sum(WEIGHTS[k] * v for k, v in components.items()))
     precip_prob_val = precip_prob or 0
-    nws_likely = _nws_signals_likely_rain(nws_short_forecast)
+    precip_sum_val = precip_sum or 0
+    severity = _rain_severity(precip_prob_val, precip_sum_val, nws_text_for_date or "")
+    has_thunder = bool(_THUNDER_RE.search((nws_text_for_date or "").lower()))
 
     return {
         "date": daily["time"][i],
         "score": score,
-        "label": _label(score, precip_prob_val, nws_likely),
-        "reasons": _reasons(apparent_f, components, precip_prob_val, nws_likely),
+        "label": _label(score, severity),
+        "reasons": _reasons(apparent_f, components, severity, has_thunder),
         "high_f": round(high_f),
         "precip_probability_pct": round(precip_prob) if precip_prob is not None else None,
         "wind_mph": round(wind_mph) if wind_mph is not None else None,
@@ -243,14 +270,16 @@ async def get_nice_day_forecast(lat: float, lon: float) -> dict:
             forecast = await nws.get_forecast(lat, lon)
         except Exception:
             return {}
-        by_date = {}
+        # Combine both the daytime and nighttime period's text for each
+        # date — NWS's confidence can jump between the two (e.g. "Chance"
+        # during the day, "Likely" overnight for the same calendar date),
+        # and a day isn't fully described by only half of it.
+        by_date: dict[str, list[str]] = {}
         for p in forecast.get("periods", []):
-            if not p.get("is_daytime"):
-                continue
             date = (p.get("start_time") or "")[:10]
-            if date:
-                by_date[date] = p.get("short_forecast")
-        return by_date
+            if date and p.get("short_forecast"):
+                by_date.setdefault(date, []).append(p["short_forecast"])
+        return {date: " ".join(texts) for date, texts in by_date.items()}
 
     # 30 min TTL: model runs update every few hours, so this just avoids
     # refetching on every dashboard refresh tick. The NWS text lookup has
