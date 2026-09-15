@@ -109,7 +109,11 @@ def _humidity_score(rh_pct: float) -> float:
 # while NWS's own forecaster writes "Chance Showers And Thunderstorms".
 # Checking both catches cases the raw probability number alone misses.
 _LIKELY_RE = re.compile(r"\blikely\b", re.IGNORECASE)
-_THUNDER_RE = re.compile(r"\bthunderstorm", re.IGNORECASE)
+# Captures whatever qualifier word(s) sit right before "thunderstorm(s)" —
+# NWS always states it immediately beforehand ("Slight Chance ... Thunder-
+# storms", "Chance ... Thunderstorms", "Thunderstorms Likely") — so this is
+# what tells a routine summer pop-up storm mention apart from a real one.
+_THUNDER_CONTEXT_RE = re.compile(r"([a-z ]{0,30})thunderstorms?", re.IGNORECASE)
 
 _LABEL_ORDER = ["Not Great", "Meh", "Fair", "Good", "Great"]
 
@@ -118,26 +122,43 @@ def _cap_label(label: str, ceiling: str) -> str:
     return ceiling if _LABEL_ORDER.index(label) > _LABEL_ORDER.index(ceiling) else label
 
 
+def _thunder_confidence(text: str) -> Optional[str]:
+    """None if thunderstorms aren't mentioned at all. "low" if every mention
+    is hedged as "slight chance" (NWS's lowest, ~20%, tier — common on an
+    otherwise ordinary summer day and not worth tanking the label over).
+    "high" for anything more confident than that — "Chance", "Likely", or
+    unqualified."""
+    matches = _THUNDER_CONTEXT_RE.findall(text)
+    if not matches:
+        return None
+    if all("slight chance" in m for m in matches):
+        return "low"
+    return "high"
+
+
 def _rain_severity(precip_prob: float, precip_sum_in: float, nws_text: str) -> Optional[str]:
     """How much a day's rain chances should hold back its label, independent
     of the plain weighted score — a low *probability* can still mean a real
     rain event (28% chance of 1.5") that a percentage-only rule would miss
-    entirely, and thunderstorms carry lightning/gust/hail risk a same-
-    probability drizzle doesn't. Two tiers, worse wins:
-      "severe"   — thunderstorms mentioned, a substantial rain total (>1"),
-                   or a high probability (>=70%). Caps at "Meh": a day with
-                   real storm potential shouldn't read as good news even if
-                   temperature/wind/sun happened to average out pleasant.
-      "moderate" — NWS says "likely", a meaningful rain total (>0.5"), or a
-                   coin-flip-or-worse probability (>=40%). Caps at "Fair".
+    entirely, and anything beyond a "slight chance" of thunderstorms carries
+    lightning/gust/hail risk a same-probability drizzle doesn't. Two tiers,
+    worse wins:
+      "severe"   — thunderstorms mentioned as more than a slight chance, a
+                   substantial rain total (>1"), or a high probability
+                   (>=70%). Caps at "Meh": a day with real storm potential
+                   shouldn't read as good news even if temperature/wind/sun
+                   happened to average out pleasant.
+      "moderate" — a slight-chance thunderstorm mention, NWS says "likely",
+                   a meaningful rain total (>0.5"), or a coin-flip-or-worse
+                   probability (>=40%). Caps at "Fair".
     """
     text = (nws_text or "").lower()
-    has_thunder = bool(_THUNDER_RE.search(text))
+    thunder = _thunder_confidence(text)
     has_likely = bool(_LIKELY_RE.search(text))
 
-    if has_thunder or precip_sum_in > 1.0 or precip_prob >= 70:
+    if thunder == "high" or precip_sum_in > 1.0 or precip_prob >= 70:
         return "severe"
-    if has_likely or precip_sum_in > 0.5 or precip_prob >= 40:
+    if thunder == "low" or has_likely or precip_sum_in > 0.5 or precip_prob >= 40:
         return "moderate"
     return None
 
@@ -214,7 +235,7 @@ def _score_day(i: int, daily: dict, nws_text_for_date: Optional[str] = None) -> 
     precip_prob_val = precip_prob or 0
     precip_sum_val = precip_sum or 0
     severity = _rain_severity(precip_prob_val, precip_sum_val, nws_text_for_date or "")
-    has_thunder = bool(_THUNDER_RE.search((nws_text_for_date or "").lower()))
+    has_thunder = _thunder_confidence((nws_text_for_date or "").lower()) is not None
 
     return {
         "date": daily["time"][i],
