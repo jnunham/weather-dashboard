@@ -421,9 +421,18 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
 
-  // Radar play/pause loop.
+  // Radar play/pause loop. Also gated on `active`: in kiosk mode this
+  // component stays permanently mounted (just hidden) so radar tiles stay
+  // warm across scene cycles — but that means this 600ms loop would
+  // otherwise keep mutating Leaflet's DOM continuously in a fully invisible
+  // subtree the whole time another scene is showing. Pausing it while
+  // hidden stops that pointless background churn (and the stale/ghosted
+  // repaint artifacts it could plausibly cause on switching scenes) without
+  // losing the "already warmed up" benefit — the loaded tiles themselves
+  // stay loaded either way; this just stops advancing the animation index
+  // nobody can see.
   useEffect(() => {
-    if (!radarPlaying || !radarReady) return undefined;
+    if (!radarPlaying || !radarReady || !active) return undefined;
     const id = setInterval(() => {
       const rs = radarRef.current;
       if (!rs.frames.length) return;
@@ -431,7 +440,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     }, 600);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radarPlaying, radarReady]);
+  }, [radarPlaying, radarReady, active]);
 
   // Layer visibility toggles.
   useEffect(() => {
