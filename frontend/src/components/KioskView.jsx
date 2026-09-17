@@ -458,11 +458,15 @@ export default function KioskView({ location }) {
       </header>
 
       <div className="kioskBody">
-        {/* Always mounted, just hidden — unmounting on every scene cycle
-            (every ~2 minutes by default) meant the radar had to re-warm up
-            from a cold start almost every time it came back around, which
-            is what "still laggy" on repeat viewing actually was. */}
-        <div className={`kioskMapWrap${scene === "map" ? "" : " kioskMapHidden"}`}>
+        {/* Mounted only while this is the active scene. This used to stay
+            permanently mounted (just hidden) so radar tiles would stay warm
+            across scene cycles, but keeping a Leaflet instance alive
+            indefinitely turned out to cause worse problems — intermittent
+            stale/corrupted rendering bleeding into other scenes — than the
+            brief re-warmup a fresh mount costs every time this scene comes
+            back around. The readiness gate in MapView (see radarReady)
+            still keeps that re-warmup from looking janky. */}
+        {scene === "map" && (
           <MapView
             location={location}
             onMapClick={() => {}}
@@ -470,9 +474,8 @@ export default function KioskView({ location }) {
             outlookHazard="cat"
             refreshTick={refreshTick}
             autoPlayRadar
-            active={scene === "map"}
           />
-        </div>
+        )}
         {scene === "conditions" && <KioskConditionsScene location={location} refreshTick={refreshTick} />}
         {scene === "days" && <KioskDaysScene location={location} refreshTick={refreshTick} />}
         {scene === "mds" && <KioskMdScene location={location} refreshTick={refreshTick} />}

@@ -80,7 +80,7 @@ function bboxIntersectsBounds(bbox, bounds) {
 // in it would be unreadable clutter, so counties simply don't render yet.
 const COUNTY_MIN_ZOOM = 7;
 
-export default function MapView({ location, onMapClick, outlookDay, outlookHazard, refreshTick, autoPlayRadar = false, active = true }) {
+export default function MapView({ location, onMapClick, outlookDay, outlookHazard, refreshTick, autoPlayRadar = false }) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -163,17 +163,6 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Kiosk mode keeps this component mounted permanently and just hides it
-  // (display: none) while another scene is showing, instead of unmounting
-  // it — that's what makes staying "warmed up" across scene cycles possible
-  // at all. But Leaflet measures its container's size when told to redraw,
-  // and a display:none element measures as 0×0, so coming back into view
-  // needs an explicit nudge to recompute real dimensions before anything
-  // drawn while hidden (or sized wrong right after) looks right again.
-  useEffect(() => {
-    if (active && mapRef.current) mapRef.current.invalidateSize();
-  }, [active]);
 
   // Recenter on location change.
   useEffect(() => {
@@ -421,18 +410,9 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
 
-  // Radar play/pause loop. Also gated on `active`: in kiosk mode this
-  // component stays permanently mounted (just hidden) so radar tiles stay
-  // warm across scene cycles — but that means this 600ms loop would
-  // otherwise keep mutating Leaflet's DOM continuously in a fully invisible
-  // subtree the whole time another scene is showing. Pausing it while
-  // hidden stops that pointless background churn (and the stale/ghosted
-  // repaint artifacts it could plausibly cause on switching scenes) without
-  // losing the "already warmed up" benefit — the loaded tiles themselves
-  // stay loaded either way; this just stops advancing the animation index
-  // nobody can see.
+  // Radar play/pause loop.
   useEffect(() => {
-    if (!radarPlaying || !radarReady || !active) return undefined;
+    if (!radarPlaying || !radarReady) return undefined;
     const id = setInterval(() => {
       const rs = radarRef.current;
       if (!rs.frames.length) return;
@@ -440,7 +420,7 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
     }, 600);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radarPlaying, radarReady, active]);
+  }, [radarPlaying, radarReady]);
 
   // Layer visibility toggles.
   useEffect(() => {

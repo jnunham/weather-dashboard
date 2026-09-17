@@ -425,28 +425,7 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
   padding: 4px 10px;
 }
 
-.kioskBody { flex: 1 1 auto; min-height: 0; display: flex; position: relative; }
-.kioskMapWrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-/* Not display:none. Leaflet positions its tiles with CSS transforms, which
-   promotes the map to its own GPU-composited layer — toggling display:none
-   forces that layer to be fully torn down and later recreated on every
-   single transition back into this scene, which is a well-known trigger for
-   stale/corrupted compositor buffers on embedded GPUs (exactly the
-   "leftover content from other scenes bleeds through, consistently, right
-   as the map reappears" symptom). Moving it off-screen instead keeps its
-   layer alive the whole time — same effect (out of the flex flow, not
-   visible, not interactive) without the teardown/recreate cycle. Explicit
-   width/height (rather than relying on flex sizing, which doesn't apply to
-   an absolutely-positioned element) keeps Leaflet's container size stable
-   throughout, so there's nothing to visually re-settle when it returns. */
-.kioskMapWrap.kioskMapHidden {
-  position: absolute;
-  top: 0;
-  left: -10000px;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
+.kioskBody { flex: 1 1 auto; min-height: 0; display: flex; }
 .kioskBody .mapColumn { flex: 1 1 auto; }
 
 .kioskScene { flex: 1 1 auto; min-height: 0; padding: 32px 40px; overflow-y: auto; }
