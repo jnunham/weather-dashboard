@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Weather Dashboard contributors — see LICENSE.
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
+# Plain uvicorn, not uvicorn[standard]: the extra pulls in uvloop/httptools
+# (optional speed-ups this app doesn't need) which have no prebuilt wheels on
+# many Raspberry Pi installs, so pip compiles them from source — tens of
+# minutes on a Pi, sometimes running out of memory. Without them uvicorn
+# falls back to asyncio + h11, which is plenty for a personal dashboard.
+uvicorn==0.30.6
 httpx==0.27.2
 feedparser==6.0.11
 python-dotenv==1.0.1
