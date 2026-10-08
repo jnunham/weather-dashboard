@@ -78,6 +78,39 @@ If you set this up before the LAN-access work landed: delete `frontend/.env`
 (it may have an old hardcoded `VITE_API_BASE_URL`) and re-run setup to
 regenerate it.
 
+### A dedicated Raspberry Pi display
+
+```bash
+python3 setup.py --pi-display
+```
+
+Run this on a Raspberry Pi (Raspberry Pi OS with the desktop) with a screen
+attached and it turns the Pi into a single-purpose weather display:
+
+- the server runs as a systemd service (`weather-dashboard`), starting on
+  boot and restarting itself if it ever crashes;
+- Chromium opens full-screen on boot, pointed at the Pi's own server, in the
+  compact small-screen layout (built for a 7" 800×480 panel);
+- desktop auto-login is turned on and screen blanking turned off via
+  `raspi-config`, since an unattended display has to boot straight to the
+  dashboard and stay lit.
+
+It asks for your `sudo` password once, and a reboot (`sudo reboot`) starts the
+display. After pulling new code, re-run the same command and reboot. The
+command prints how to undo everything it installed.
+
+The compact layout is opt-in: it's only used when the kiosk URL has
+`compact=1` (which `--pi-display` sets). A normal kiosk screen — a TV, a
+monitor — never gets it, whatever its resolution:
+`http://<address>/?kiosk=1&compact=1` turns it on for any browser.
+
+If the dashboard doesn't appear on boot, the autostart entry is
+`~/.config/autostart/weather-dashboard-kiosk.desktop`; some Raspberry Pi OS
+versions run their own autostart file instead
+(`~/.config/labwc/autostart` on newer Wayland images,
+`~/.config/lxsession/LXDE-pi/autostart` on older X11 ones) — add the line
+`~/.config/weather-dashboard/kiosk.sh &` there.
+
 ### Configuration
 
 Both `backend/.env.example` and `frontend/.env.example` are copied to

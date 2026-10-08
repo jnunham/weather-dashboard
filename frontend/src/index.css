@@ -630,6 +630,116 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .kioskDot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
 .kioskDot.active { background: var(--accent); }
 
+/* ---------- Kiosk on small dedicated screens (e.g. a 7" Raspberry Pi display) ---------- */
+/* Opt-in: only applies when the kiosk URL has ?compact=1 (which
+   `setup.py --pi-display` sets), never inferred from screen size — so a
+   normal wall TV or a laptop in kiosk mode is never affected.
+
+   The default kiosk sizing assumes a TV/monitor (1.5x zoom on a 1080p panel
+   is ~1280 CSS px wide), which a small panel can't take. So step the zoom
+   down by physical width — 800x480, 1024x600 and 1280x800 all land around
+   the same ~800-930 CSS px working area — and use a compact layout sized for
+   that. Media queries read the real viewport (not the zoomed one), which is
+   why zoom is tiered by device width instead of derived. */
+@media (max-width: 1150px) { .kiosk.kioskSmallScreen { zoom: 1.25; } }
+@media (max-width: 900px) { .kiosk.kioskSmallScreen { zoom: 1; } }
+
+.kioskSmallScreen .kioskHeader { padding: 6px 14px; gap: 12px; }
+.kioskSmallScreen .kioskLocation { font-size: 20px; }
+.kioskSmallScreen .kioskClock { font-size: 14px; }
+.kioskSmallScreen .kioskExit { font-size: 11px; padding: 2px 8px; }
+
+.kioskSmallScreen .kioskScene { padding: 10px 14px; }
+/* Nobody is scrolling a wall/desk display with a mouse; a visible
+   scrollbar is just noise (touch-scrolling still works without one). */
+.kioskSmallScreen .kioskScene,
+.kioskSmallScreen .kioskConditionsRight { scrollbar-width: none; }
+.kioskSmallScreen .kioskScene::-webkit-scrollbar,
+.kioskSmallScreen .kioskConditionsRight::-webkit-scrollbar { display: none; }
+/* The conditions layout is height:100% *under* a title, so it overflowed
+   the scene by exactly the title's height. Let it take the remaining space
+   instead. */
+.kioskSmallScreen .kioskConditionsScene { display: flex; flex-direction: column; }
+.kioskSmallScreen .kioskConditionsScene .kioskConditionsLayout { flex: 1 1 auto; height: auto; }
+.kioskSmallScreen .kioskSceneTitle { font-size: 18px; margin: 0 0 8px 0; }
+.kioskSmallScreen .kioskLoading,
+.kioskSmallScreen .kioskEmpty { font-size: 14px; }
+.kioskSmallScreen .kioskDots { padding: 6px; gap: 8px; }
+.kioskSmallScreen .kioskDot { width: 8px; height: 8px; }
+
+/* The phone layout's fixed 42vh map height is for a scrolling page; in
+   kiosk the map should fill whatever space the scene has. The control row
+   goes back to a single line, since there's room for it at this width. */
+.kioskSmallScreen .mapColumn { flex: 1 1 auto; height: auto; min-height: 0; }
+.kioskSmallScreen .radarControls { flex-wrap: nowrap; height: auto; padding: 6px 12px; row-gap: 0; gap: 8px; }
+.kioskSmallScreen .radarControls input[type="range"] { order: 0; flex: 1 1 auto; flex-basis: auto; }
+.kioskSmallScreen .radarTime { width: auto; font-size: 11px; }
+.kioskSmallScreen .toggle { font-size: 11px; }
+
+/* Conditions & Alerts */
+.kioskSmallScreen .kioskConditionsLayout { grid-template-columns: 1.4fr 1fr; gap: 14px; }
+.kioskSmallScreen .kioskConditionsRight { gap: 10px; }
+.kioskSmallScreen .kioskConditionsMain { gap: 14px; margin-bottom: 12px; }
+.kioskSmallScreen .kioskCondIcon { width: 68px; height: 68px; }
+/* Let the temp block shrink so a long station name wraps instead of
+   squeezing the stats column into breaking "9 mph" / "29.81 inHg" apart. */
+.kioskSmallScreen .kioskTempBlock { flex: 0 1 auto; min-width: 0; }
+.kioskSmallScreen .kioskTempBig { font-size: 54px; }
+.kioskSmallScreen .kioskCondText { font-size: 16px; margin-top: 4px; }
+.kioskSmallScreen .kioskStationText { font-size: 12px; margin-top: 2px; }
+.kioskSmallScreen .kioskObsText { font-size: 12px; margin-top: 2px; }
+.kioskSmallScreen .kioskConditionsStats { gap: 8px 16px; }
+.kioskSmallScreen .kioskConditionsStats span { font-size: 12px; }
+.kioskSmallScreen .kioskConditionsStats { flex: 0 0 auto; }
+.kioskSmallScreen .kioskConditionsStats strong { font-size: 17px; white-space: nowrap; }
+
+.kioskSmallScreen .kioskGlanceRow { gap: 8px; margin-bottom: 8px; }
+.kioskSmallScreen .kioskGlanceAlert,
+.kioskSmallScreen .kioskGlanceOutlook,
+.kioskSmallScreen .kioskGlanceNiceDay { padding: 10px 12px; min-height: 0; border-radius: 8px; }
+.kioskSmallScreen .kioskGlanceAlert { border-left-width: 4px; }
+.kioskSmallScreen .kioskGlanceAlertLabel { font-size: 10px; margin-bottom: 4px; }
+.kioskSmallScreen .kioskGlanceAlertEvent { font-size: 15px; margin-bottom: 3px; }
+.kioskSmallScreen .kioskAlertArea { font-size: 12px; margin-bottom: 0; }
+.kioskSmallScreen .kioskGlanceOutlookLabel { font-size: 10px; margin-bottom: 6px; }
+.kioskSmallScreen .kioskGlanceOutlook .kioskOutlookChip,
+.kioskSmallScreen .kioskGlanceNiceDay .kioskOutlookChip { font-size: 14px; padding: 5px 10px; margin-bottom: 6px; }
+.kioskSmallScreen .kioskNiceDayNote { font-size: 11px; }
+.kioskSmallScreen .kioskHazardRow { gap: 4px; }
+.kioskSmallScreen .kioskHazardChip { font-size: 11px; padding: 3px 7px; }
+
+.kioskSmallScreen .kioskCompactListBlock h3 { font-size: 13px; margin-bottom: 6px; }
+.kioskSmallScreen .kioskCompactCard { padding: 7px 9px; margin-bottom: 6px; border-radius: 6px; }
+.kioskSmallScreen .kioskCompactHeader { font-size: 14px; margin-bottom: 2px; }
+.kioskSmallScreen .kioskCompactSub { font-size: 11px; }
+
+/* Coming Days: a fixed 4-wide grid (two rows for a full week) rather than
+   auto-fit, so the card count never reflows into a tall single column. */
+.kioskSmallScreen .kioskDaysGrid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.kioskSmallScreen .kioskDayCard { padding: 8px; border-radius: 8px; }
+.kioskSmallScreen .kioskDayName { font-size: 13px; margin-bottom: 4px; }
+.kioskSmallScreen .kioskDayIcon { width: 40px; height: 40px; margin-bottom: 4px; }
+.kioskSmallScreen .kioskDayTemp { font-size: 19px; margin-bottom: 2px; }
+.kioskSmallScreen .kioskDayText { font-size: 11px; margin-bottom: 6px; min-height: 26px; }
+.kioskSmallScreen .kioskDayNiceDayChip { padding: 2px 9px; font-size: 11px; }
+
+/* Mesoscale Discussions */
+.kioskSmallScreen .kioskMdGrid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.kioskSmallScreen .kioskMdCard { padding: 10px; border-radius: 8px; }
+.kioskSmallScreen .kioskMdTitle { font-size: 13px; margin-bottom: 6px; }
+.kioskSmallScreen .kioskMdCard img { max-height: 150px; object-fit: contain; margin-bottom: 6px; }
+.kioskSmallScreen .kioskMdText { font-size: 11px; }
+
+/* Forecast Discussion */
+.kioskSmallScreen .kioskAfdHeader { gap: 10px; margin-bottom: 10px; }
+.kioskSmallScreen .kioskAfdOffice { font-size: 11px; padding: 2px 8px; }
+.kioskSmallScreen .kioskAfdIssued { font-size: 11px; }
+.kioskSmallScreen .kioskAfdBullets { gap: 8px; }
+.kioskSmallScreen .kioskAfdBulletCard { gap: 10px; padding: 10px 12px; border-radius: 8px; }
+.kioskSmallScreen .kioskAfdBulletNum { width: 26px; height: 26px; font-size: 14px; }
+.kioskSmallScreen .kioskAfdBulletText { font-size: 16px; line-height: 1.3; padding-top: 2px; }
+.kioskSmallScreen .kioskAfdFallback { font-size: 14px; line-height: 1.4; }
+
 /* ---------- Mobile layout ---------- */
 /* A phone-width viewport, not a specific device's user-agent string, is
    what actually determines whether the side-by-side map+panel layout fits —

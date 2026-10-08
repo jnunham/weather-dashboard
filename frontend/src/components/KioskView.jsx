@@ -23,7 +23,10 @@ const DATA_REFRESH_MS = 5 * 60 * 1000;
 const CLOCK_TICK_MS = 1000;
 
 // ?scenes=map,conditions and ?duration=15 (seconds) let a specific wall
-// display be tuned without touching code.
+// display be tuned without touching code. ?compact=1 switches to the layout
+// sized for a small dedicated screen (e.g. a 7" Raspberry Pi display) — an
+// explicit flag rather than a screen-size guess, so it only ever applies to
+// a display that was set up for it (setup.py --pi-display launches with it).
 function readKioskConfig() {
   const params = new URLSearchParams(window.location.search);
   const requested = (params.get("scenes") || "")
@@ -35,7 +38,7 @@ function readKioskConfig() {
   const durationSec = parseInt(params.get("duration"), 10);
   const sceneDurationMs = Number.isFinite(durationSec) && durationSec > 0 ? durationSec * 1000 : DEFAULT_SCENE_DURATION_MS;
 
-  return { scenes, sceneDurationMs };
+  return { scenes, sceneDurationMs, compact: params.get("compact") === "1" };
 }
 
 // Everything about "right now": conditions, forecast, the single
@@ -422,7 +425,7 @@ function KioskAfdScene({ location, refreshTick }) {
 }
 
 export default function KioskView({ location }) {
-  const [{ scenes, sceneDurationMs }] = useState(readKioskConfig);
+  const [{ scenes, sceneDurationMs, compact }] = useState(readKioskConfig);
   const [sceneIndex, setSceneIndex] = useState(0);
   const [now, setNow] = useState(new Date());
   const [refreshTick, setRefreshTick] = useState(0);
@@ -445,7 +448,7 @@ export default function KioskView({ location }) {
   const scene = scenes[sceneIndex];
 
   return (
-    <div className="kiosk">
+    <div className={`kiosk${compact ? " kioskSmallScreen" : ""}`}>
       <header className="kioskHeader">
         <div className="kioskLocation">{location.label}</div>
         <div className="kioskClock">
