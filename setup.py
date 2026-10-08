@@ -83,19 +83,141 @@ def ensure_env_file(directory: Path):
         print(f"Created {target.relative_to(ROOT)} from .env.example")
 
 
+# Vite 5 / Rollup (the frontend build) need Node 18+. Distro packages are often
+# far older — Raspberry Pi OS "Bullseye" and Ubuntu 20.04/22.04 ship Node
+# 10-12 — and fail with confusing errors deep inside `vite build`, so check
+# the version up front instead of just checking that some `node` exists.
+MIN_NODE_MAJOR = 18
+# 20, not newer, on purpose: Node 22+'s official Linux builds need a newer
+# libstdc++ than Debian 11 / Raspberry Pi OS Bullseye has.
+NODE_INSTALL_MAJOR = 20
+LOCAL_NODE_DIR = Path.home() / ".local" / "node"
+
+
+def use_local_node():
+    """Put a Node installed by this script (see install_node_from_nodejs_org)
+    ahead of the system one on PATH, so re-runs find it without a new shell."""
+    bin_dir = LOCAL_NODE_DIR / "bin"
+    path = os.environ.get("PATH", "")
+    if (bin_dir / "node").exists() and str(bin_dir) not in path.split(os.pathsep):
+        os.environ["PATH"] = str(bin_dir) + os.pathsep + path
+
+
+def node_major():
+    """Major version of the `node` on PATH, or None if absent/unrunnable."""
+    node = shutil.which("node")
+    if not node:
+        return None
+    try:
+        out = subprocess.run([node, "--version"], capture_output=True, text=True, check=True).stdout
+        return int(out.strip().lstrip("v").split(".")[0])
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        return None
+
+
 def have_node():
-    return shutil.which("node") is not None and shutil.which("npm") is not None
+    use_local_node()
+    major = node_major()
+    return shutil.which("npm") is not None and major is not None and major >= MIN_NODE_MAJOR
+
+
+def install_node_from_nodejs_org():
+    """Linux: download the official Node.js build for this CPU, check it
+    against nodejs.org's published SHA-256, and unpack it into ~/.local/node
+    (no root needed, and it doesn't touch the distro's own — older — Node).
+    Returns True if a working node is on PATH afterward."""
+    import hashlib
+    import struct
+    import tarfile
+    import tempfile
+    import urllib.request
+
+    arch = {"x86_64": "x64", "amd64": "x64", "aarch64": "arm64", "arm64": "arm64", "armv7l": "armv7l"}.get(
+        platform.machine().lower()
+    )
+    # A 64-bit kernel under a 32-bit userland (some Pi setups) reports
+    # aarch64, but only a 32-bit Node will actually run there.
+    if arch == "arm64" and struct.calcsize("P") == 4:
+        arch = "armv7l"
+    if not arch:
+        print(f"No official Node.js build for this CPU ({platform.machine()}).")
+        return False
+
+    base = f"https://nodejs.org/dist/latest-v{NODE_INSTALL_MAJOR}.x"
+    try:
+        shasums = urllib.request.urlopen(f"{base}/SHASUMS256.txt", timeout=30).read().decode()
+        wanted = None
+        for line in shasums.splitlines():
+            digest, _, name = line.partition("  ")
+            if name.endswith(f"-linux-{arch}.tar.xz"):
+                wanted = (digest, name)
+        if not wanted:
+            print(f"nodejs.org lists no Node {NODE_INSTALL_MAJOR} build for linux-{arch}.")
+            return False
+        expected_sha, filename = wanted
+
+        print(f"Downloading {filename} from nodejs.org ...")
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / filename
+            sha = hashlib.sha256()
+            with urllib.request.urlopen(f"{base}/{filename}", timeout=60) as resp, open(archive, "wb") as out:
+                while True:
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    sha.update(chunk)
+                    out.write(chunk)
+            if sha.hexdigest() != expected_sha:
+                print("Download failed its checksum check — not installing it.")
+                return False
+
+            staging = Path(tmp) / "unpacked"
+            with tarfile.open(archive, "r:xz") as tar:
+                # Source and checksum are both nodejs.org over HTTPS, but
+                # still refuse anything that would unpack outside staging.
+                root = os.path.realpath(staging)
+                for member in tar.getmembers():
+                    target = os.path.realpath(os.path.join(root, member.name))
+                    if os.path.commonpath([root, target]) != root:
+                        print(f"Unexpected path in archive ({member.name}) — not installing it.")
+                        return False
+                tar.extractall(staging)
+
+            unpacked = next(staging.iterdir())
+            if LOCAL_NODE_DIR.exists():
+                shutil.rmtree(LOCAL_NODE_DIR)
+            LOCAL_NODE_DIR.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(unpacked), str(LOCAL_NODE_DIR))
+    except (OSError, tarfile.TarError) as exc:
+        print(f"Couldn't install Node.js from nodejs.org: {exc}")
+        return False
+
+    use_local_node()
+    if have_node():
+        print(f"Installed Node.js {node_major()} to {LOCAL_NODE_DIR}")
+        return True
+    print("Downloaded Node.js but it won't run on this system.")
+    return False
 
 
 def install_node():
-    """Best-effort automatic Node.js install. Returns True if node+npm are
-    on PATH afterward (freshly installed or already present)."""
+    """Best-effort automatic Node.js install. Returns True if a new-enough
+    node + npm are on PATH afterward (freshly installed or already present)."""
 
     if have_node():
         return True
 
-    print("Node.js/npm not found — installing it automatically...")
+    existing = node_major()
+    if existing is not None:
+        print(f"Node.js {existing} is too old (the frontend build needs {MIN_NODE_MAJOR}+) — installing a current one...")
+    else:
+        print("Node.js/npm not found — installing it automatically...")
     system = platform.system()
+
+    # On Linux the distro's package is the one most likely to be too old, so
+    # go to nodejs.org first and only fall back to the package manager.
+    if system == "Linux" and install_node_from_nodejs_org():
+        return True
 
     try:
         if system == "Linux":
@@ -132,7 +254,8 @@ def install_node():
         print("Node.js installed.")
         return True
 
-    print("Node.js still isn't on PATH — you may need to open a new terminal, then re-run this script.")
+    print(f"A Node.js {MIN_NODE_MAJOR}+ still isn't available — you may need to open a new terminal, then re-run this script,")
+    print("or install it manually: https://nodejs.org")
     return False
 
 
