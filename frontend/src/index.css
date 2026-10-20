@@ -394,6 +394,52 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
   cursor: pointer;
 }
 
+/* ---------- On-screen keyboard (touch display, ?compact=1) ---------- */
+
+.osk {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000; /* above the first-run modal (1000) */
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  padding: 6px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation; /* taps register at once, no double-tap-to-zoom wait */
+}
+.oskRow { display: flex; gap: 5px; }
+.oskKey {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+}
+.oskKey:active, .oskKey--on { background: var(--accent); color: #06111f; border-color: var(--accent); }
+.oskKey--wide { flex: 1.6 1 0; }
+.oskKey--space { flex: 5 1 0; }
+.oskKey--accent { background: var(--accent); color: #06111f; border-color: var(--accent); font-weight: 700; }
+
+/* While the keyboard is up, shrink the page and re-center the first-run
+   prompt in what's left above it, so nothing being typed into is covered. */
+html.kbOpen #root { padding-bottom: var(--kbHeight, 0px); box-sizing: border-box; }
+html.kbOpen .modalOverlay { bottom: var(--kbHeight, 0px); }
+/* The prompt is ~310px tall on its own — more than is left above the
+   keyboard on an 800x480 screen. Drop its explanatory paragraph (the only
+   un-classed <p> in it) and trim padding while the keyboard is up. */
+html.kbOpen .modal { padding: 14px 18px; }
+html.kbOpen .modal > p:not([class]) { display: none; }
+
 /* ---------- Kiosk mode ---------- */
 
 /* zoom (not transform) so layout actually reflows at the larger size rather
@@ -403,6 +449,12 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
    above individually. Widely supported in Chromium, which kiosk displays
    run almost universally. */
 .kiosk { display: flex; flex-direction: column; height: 100%; background: var(--bg); cursor: none; zoom: 1.5; }
+
+/* Swiping between scenes: pan-y tells the browser to keep handling vertical
+   drags itself (scrolling an overflowing scene) but leave horizontal ones to
+   the page — otherwise it claims the gesture and the swipe never arrives.
+   No text selection, so dragging a finger across a scene doesn't highlight. */
+.kiosk { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 
 .kioskHeader {
   display: flex;
@@ -563,6 +615,8 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 .kioskDayTemp { font-size: 24px; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
 .kioskDayText { font-size: 13px; color: var(--text); margin-bottom: 12px; min-height: 34px; }
 .kioskDayNiceDayChip { display: inline-block; padding: 4px 12px; border-radius: 8px; color: #06111f; font-weight: 700; font-size: 13px; }
+.kioskDayWhy { margin-top: 8px; font-size: 12px; line-height: 1.3; color: var(--muted); }
+.kioskDayWhy::first-letter { text-transform: uppercase; }
 
 /* Condensed list cards used for Watches & Warnings / SPC Watches on the
    Current Conditions scene — smaller than the standalone kioskAlertCard
@@ -716,12 +770,13 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 /* Coming Days: a fixed 4-wide grid (two rows for a full week) rather than
    auto-fit, so the card count never reflows into a tall single column. */
 .kioskSmallScreen .kioskDaysGrid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.kioskSmallScreen .kioskDayCard { padding: 8px; border-radius: 8px; }
-.kioskSmallScreen .kioskDayName { font-size: 13px; margin-bottom: 4px; }
-.kioskSmallScreen .kioskDayIcon { width: 40px; height: 40px; margin-bottom: 4px; }
+.kioskSmallScreen .kioskDayCard { padding: 6px 8px; border-radius: 8px; }
+.kioskSmallScreen .kioskDayName { font-size: 13px; margin-bottom: 3px; }
+.kioskSmallScreen .kioskDayIcon { width: 34px; height: 34px; margin-bottom: 3px; }
 .kioskSmallScreen .kioskDayTemp { font-size: 19px; margin-bottom: 2px; }
-.kioskSmallScreen .kioskDayText { font-size: 11px; margin-bottom: 6px; min-height: 26px; }
+.kioskSmallScreen .kioskDayText { font-size: 11px; margin-bottom: 5px; min-height: 24px; }
 .kioskSmallScreen .kioskDayNiceDayChip { padding: 2px 9px; font-size: 11px; }
+.kioskSmallScreen .kioskDayWhy { margin-top: 4px; font-size: 10px; }
 
 /* Mesoscale Discussions */
 .kioskSmallScreen .kioskMdGrid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }

@@ -11,7 +11,7 @@
 // guidance from the National Weather Service and local emergency
 // management, not this app.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api.js";
 import { alertClass, fetchOutlookBreakdown, filterNearbyAlerts, fmt, minutesSince, NICE_DAY_COLORS, topAlert } from "../utils.js";
@@ -279,9 +279,14 @@ function KioskDaysScene({ location, refreshTick }) {
                 </div>
                 <div className="kioskDayText">{p.short_forecast}</div>
                 {niceDay && (
-                  <span className="kioskDayNiceDayChip" style={{ background: NICE_DAY_COLORS[niceDay.label] || "#888" }}>
-                    {niceDay.label}
-                  </span>
+                  <>
+                    <span className="kioskDayNiceDayChip" style={{ background: NICE_DAY_COLORS[niceDay.label] || "#888" }}>
+                      {niceDay.label}
+                    </span>
+                    {/* Why it got that label — the forecast text beside it
+                        ("Partly Sunny") often doesn't explain a "Meh". */}
+                    <div className="kioskDayWhy">{niceDay.reasons?.length ? niceDay.reasons.join(", ") : "comfortable"}</div>
+                  </>
                 )}
               </div>
             );
@@ -292,7 +297,12 @@ function KioskDaysScene({ location, refreshTick }) {
   );
 }
 
-function KioskMdScene({ location, refreshTick }) {
+// Fetched up in KioskView (not inside the scene) so the rotation can decide
+// whether the Mesoscale Discussions scene is worth showing at all — most of
+// the time there are none, and a scene that just says "none" is dead air.
+// mds stays null until the first answer; a failed fetch counts as "none" and
+// is retried well before the normal refresh (see below).
+function useMesoscaleDiscussions(location, refreshTick) {
   const [mds, setMds] = useState(null);
   const [stateName, setStateName] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -339,6 +349,10 @@ function KioskMdScene({ location, refreshTick }) {
     return () => clearTimeout(id);
   }, [failed]);
 
+  return { mds, stateName };
+}
+
+function KioskMdScene({ mds, stateName }) {
   return (
     <div className="kioskScene kioskMdScene">
       <h2 className="kioskSceneTitle">Mesoscale Discussions{stateName ? ` — ${stateName}` : ""}</h2>
@@ -424,16 +438,46 @@ function KioskAfdScene({ location, refreshTick }) {
   );
 }
 
+// A horizontal drag at least this far (px), and clearly more horizontal than
+// vertical, counts as a swipe between scenes. Vertical drags are left alone
+// so a scene that overflows can still be scrolled by touch.
+const SWIPE_MIN_PX = 50;
+
+// The scene after (dir = 1) or before (dir = -1) `current` in `rotation`,
+// wrapping around. A scene that isn't in the rotation (e.g. Mesoscale
+// Discussions just dropped out) is treated as the first entry.
+function stepScene(rotation, current, dir) {
+  const i = rotation.includes(current) ? rotation.indexOf(current) : 0;
+  return rotation[(i + dir + rotation.length) % rotation.length];
+}
+
 export default function KioskView({ location }) {
   const [{ scenes, sceneDurationMs, compact }] = useState(readKioskConfig);
-  const [sceneIndex, setSceneIndex] = useState(0);
   const [now, setNow] = useState(new Date());
   const [refreshTick, setRefreshTick] = useState(0);
+  const { mds, stateName } = useMesoscaleDiscussions(location, refreshTick);
+
+  // Only rotate through Mesoscale Discussions when there's actually one to
+  // read. If that leaves nothing at all (someone configured ?scenes=mds only)
+  // fall back to the full list rather than a blank screen.
+  const hasMds = mds !== null && mds.length > 0;
+  const visibleScenes = scenes.filter((s) => s !== "mds" || hasMds);
+  const rotation = visibleScenes.length ? visibleScenes : scenes;
+  const rotationKey = rotation.join(",");
+
+  // Tracked by scene *name*, not position, so the scene on screen doesn't
+  // jump when the rotation's length changes under it.
+  const [sceneName, setSceneName] = useState(scenes[0]);
+  const scene = rotation.includes(sceneName) ? sceneName : rotation[0];
+  // Bumped on a manual swipe so the auto-advance timer restarts — otherwise
+  // a swipe just before the timer fires would skip two scenes at once.
+  const [navCount, setNavCount] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setSceneIndex((i) => (i + 1) % scenes.length), sceneDurationMs);
+    const id = setInterval(() => setSceneName((cur) => stepScene(rotation, cur, 1)), sceneDurationMs);
     return () => clearInterval(id);
-  }, [scenes.length, sceneDurationMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotationKey, sceneDurationMs, navCount]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
@@ -445,17 +489,41 @@ export default function KioskView({ location }) {
     return () => clearInterval(id);
   }, []);
 
-  const scene = scenes[sceneIndex];
+  const swipeStart = useRef(null);
+  function handlePointerDown(e) {
+    swipeStart.current = { x: e.clientX, y: e.clientY };
+  }
+  function handlePointerUp(e) {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // Swiping left (finger moving left) reveals the next scene.
+      setSceneName((cur) => stepScene(rotation, cur, dx < 0 ? 1 : -1));
+      setNavCount((n) => n + 1);
+    }
+  }
 
   return (
-    <div className={`kiosk${compact ? " kioskSmallScreen" : ""}`}>
+    <div
+      className={`kiosk${compact ? " kioskSmallScreen" : ""}`}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => {
+        swipeStart.current = null;
+      }}
+    >
       <header className="kioskHeader">
         <div className="kioskLocation">{location.label}</div>
         <div className="kioskClock">
           {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} &middot;{" "}
           {now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <a className="kioskExit" href="?">
+        {/* Keep the small-screen flag on exit, so the regular dashboard it
+            lands on still gets the on-screen keyboard. */}
+        <a className="kioskExit" href={compact ? "?compact=1" : "?"}>
           Exit Kiosk
         </a>
       </header>
@@ -477,17 +545,18 @@ export default function KioskView({ location }) {
             outlookHazard="cat"
             refreshTick={refreshTick}
             autoPlayRadar
+            lockView={compact}
           />
         )}
         {scene === "conditions" && <KioskConditionsScene location={location} refreshTick={refreshTick} />}
         {scene === "days" && <KioskDaysScene location={location} refreshTick={refreshTick} />}
-        {scene === "mds" && <KioskMdScene location={location} refreshTick={refreshTick} />}
+        {scene === "mds" && <KioskMdScene mds={mds} stateName={stateName} />}
         {scene === "afd" && <KioskAfdScene location={location} refreshTick={refreshTick} />}
       </div>
 
       <div className="kioskDots">
-        {scenes.map((s, i) => (
-          <span key={s} className={`kioskDot${i === sceneIndex ? " active" : ""}`} />
+        {rotation.map((s) => (
+          <span key={s} className={`kioskDot${s === scene ? " active" : ""}`} />
         ))}
       </div>
     </div>

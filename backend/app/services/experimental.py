@@ -182,7 +182,26 @@ def _label(score: float, severity: Optional[str]) -> str:
     return label
 
 
-def _reasons(apparent_f: float, components: dict, severity: Optional[str], has_thunder: bool) -> list[str]:
+def _mild_reason(apparent_f: float, components: dict) -> Optional[str]:
+    """The single factor that cost the most weighted points, in a mild word.
+    For days that aren't great but where no one factor was bad enough to trip
+    _reasons' thresholds (a bit warm + a bit humid + a bit breezy adds up to
+    "Fair", with nothing individually flagged) — without this such a day
+    shows a label and no explanation at all."""
+    deficits = {k: WEIGHTS[k] * (100 - components[k]) for k in WEIGHTS}
+    worst = max(deficits, key=deficits.get)
+    if deficits[worst] < 3:  # effectively perfect on every factor
+        return None
+    return {
+        "temp": "cool" if apparent_f < 68 else "warm",
+        "precip": "some rain chance",
+        "sun": "some clouds",
+        "wind": "breezy",
+        "humidity": "a bit humid",
+    }[worst]
+
+
+def _reasons(apparent_f: float, components: dict, severity: Optional[str], has_thunder: bool, score: int) -> list[str]:
     """Short plain-language notes for whichever factors dragged the score
     down, worst first — so the card can say *why*, not just show a number."""
     candidates = []
@@ -205,6 +224,10 @@ def _reasons(apparent_f: float, components: dict, severity: Optional[str], has_t
     top_reason = "thunderstorms possible" if has_thunder else "rain likely"
     if severity and top_reason not in reasons:
         reasons = [top_reason, *[r for r in reasons if r != "rain likely"][:1]]
+    if not reasons and score < 85:
+        mild = _mild_reason(apparent_f, components)
+        if mild:
+            reasons = [mild]
     return reasons
 
 
@@ -241,7 +264,7 @@ def _score_day(i: int, daily: dict, nws_text_for_date: Optional[str] = None) -> 
         "date": daily["time"][i],
         "score": score,
         "label": _label(score, severity),
-        "reasons": _reasons(apparent_f, components, severity, has_thunder),
+        "reasons": _reasons(apparent_f, components, severity, has_thunder, score),
         "high_f": round(high_f),
         "precip_probability_pct": round(precip_prob) if precip_prob is not None else None,
         "wind_mph": round(wind_mph) if wind_mph is not None else None,

@@ -22,17 +22,19 @@ import LocationPrompt from "./components/LocationPrompt.jsx";
 import LocationRiskCard from "./components/LocationRiskCard.jsx";
 import MapView from "./components/MapView.jsx";
 import MesoscaleDiscussionsCard from "./components/MesoscaleDiscussionsCard.jsx";
+import OnScreenKeyboard from "./components/OnScreenKeyboard.jsx";
 import OutlookCard from "./components/OutlookCard.jsx";
 import Ticker from "./components/Ticker.jsx";
 import TopBar from "./components/TopBar.jsx";
 
 const urlParams = new URLSearchParams(window.location.search);
 const isKiosk = urlParams.get("kiosk") === "1";
+const isCompact = urlParams.get("compact") === "1";
 
 const STORAGE_KEY = "wx_dashboard_location";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-export default function App() {
+function AppContent() {
   const [location, setLocation] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -121,5 +123,18 @@ export default function App() {
         </aside>
       </main>
     </div>
+  );
+}
+
+// ?compact=1 marks a small dedicated touchscreen (the Raspberry Pi kiosk,
+// see setup.py --pi-display), which has no physical keyboard — so it gets the
+// on-screen one, on whichever screen it's showing (first-run location prompt,
+// kiosk, or the regular dashboard).
+export default function App() {
+  return (
+    <>
+      <AppContent />
+      {isCompact && <OnScreenKeyboard />}
+    </>
   );
 }

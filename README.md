@@ -29,7 +29,10 @@ safety.
 - **Kiosk mode** (`?kiosk=1`) — full-screen, auto-rotating display for a
   spare monitor: map, current conditions + alerts, mesoscale discussions,
   and the local forecast discussion's key messages. Scenes and timing are
-  configurable via `?scenes=map,conditions&duration=15`.
+  configurable via `?scenes=map,conditions&duration=15`. The mesoscale scene
+  only appears while there's an active discussion — otherwise it's skipped —
+  and each upcoming day's Nice Day rating comes with a short reason
+  ("windy", "rain likely", "some clouds"…).
 - **Mobile-friendly** — the normal dashboard reflows into a single-column,
   touch-friendly layout on any phone-width screen automatically (no app to
   install, no separate URL — just open it on the phone's browser).
@@ -103,6 +106,17 @@ The compact layout is opt-in: it's only used when the kiosk URL has
 `compact=1` (which `--pi-display` sets). A normal kiosk screen — a TV, a
 monitor — never gets it, whatever its resolution:
 `http://<address>/?kiosk=1&compact=1` turns it on for any browser.
+
+`compact=1` is also what makes the display touch-friendly with no keyboard or
+mouse attached:
+
+- **Swipe** left or right anywhere on the screen to move between scenes (the
+  rotation timer restarts after each swipe). The map scene is locked in place
+  in this mode so a swipe over it changes scene instead of panning the map.
+- An **on-screen keyboard** slides up whenever a text field is tapped — the
+  first-run location prompt, or the city box on the regular dashboard (reached
+  with the "Exit Kiosk" link, which keeps `compact=1`). **Go** submits and
+  puts the keyboard away; **⌄** just hides it.
 
 If the dashboard doesn't appear on boot, the autostart entry is
 `~/.config/autostart/weather-dashboard-kiosk.desktop`; some Raspberry Pi OS

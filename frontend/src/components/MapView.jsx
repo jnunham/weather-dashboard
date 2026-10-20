@@ -80,7 +80,10 @@ function bboxIntersectsBounds(bbox, bounds) {
 // in it would be unreadable clutter, so counties simply don't render yet.
 const COUNTY_MIN_ZOOM = 7;
 
-export default function MapView({ location, onMapClick, outlookDay, outlookHazard, refreshTick, autoPlayRadar = false }) {
+// lockView: no panning/zooming and no zoom buttons. For a touchscreen kiosk,
+// where a drag on the map would otherwise pan it instead of being a swipe to
+// the next scene — and nobody is positioning a wall display's map anyway.
+export default function MapView({ location, onMapClick, outlookDay, outlookHazard, refreshTick, autoPlayRadar = false, lockView = false }) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -110,7 +113,10 @@ export default function MapView({ location, onMapClick, outlookDay, outlookHazar
 
   // Init map once.
   useEffect(() => {
-    const map = L.map(mapElRef.current, { zoomControl: true }).setView([location.lat, location.lon], 8);
+    const mapOptions = lockView
+      ? { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false }
+      : { zoomControl: true };
+    const map = L.map(mapElRef.current, mapOptions).setView([location.lat, location.lon], 8);
     mapRef.current = map;
 
     // Base map is a bundled, offline US state-boundary outline — not live
