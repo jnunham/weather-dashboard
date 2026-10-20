@@ -68,6 +68,9 @@ export const api = {
   // sent as the literal string "undefined".
   mesoscaleDiscussions: (lat, lon) => getJson("/api/mesoscale-discussions", lat != null && lon != null ? { lat, lon } : {}),
   geocode: (q) => getJson("/api/geocode", { q }),
+  // Up to several candidate matches (for picking from a list), rather than
+  // geocode()'s single best guess.
+  geocodeSearch: (q) => getJson("/api/geocode/search", { q }),
   // "Experimental" products: this app's own heuristic scores over raw
   // forecast-model fields, not an official NWS/SPC product — see
   // backend/app/services/experimental.py for the formula.

@@ -14,10 +14,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // A touchscreen keyboard for a dedicated display with no physical one (the
-// Raspberry Pi kiosk). Built into the page on purpose rather than relying on
-// an OS keyboard package: those behave differently between Raspberry Pi OS's
-// older X11 and newer Wayland desktops, and a browser in kiosk mode often
-// doesn't trigger them at all. This works the same everywhere.
+// Raspberry Pi kiosk), modelled on the iPhone's so it needs no explaining:
+// keys type on touch-down with a magnified pop-up, shift capitalises the next
+// letter (double-tap for caps lock) and switches itself on at the start of
+// each word, backspace repeats when held, and 123 swaps to numbers.
+//
+// Built into the page on purpose rather than relying on an OS keyboard
+// package: those behave differently between Raspberry Pi OS's older X11 and
+// newer Wayland desktops, and a browser in kiosk mode often doesn't trigger
+// them at all. This works the same everywhere.
 //
 // It shows itself whenever a text field is focused and hides when focus
 // leaves, so nothing else in the app needs to know it exists.
@@ -39,35 +44,61 @@ function setNativeValue(el, value) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-// Enough for a place name or a "lat,lon" pair: letters, digits, and the
-// punctuation those need.
-const ROWS = [
-  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-  ["shift", "z", "x", "c", "v", "b", "n", "m", "backspace"],
-  [",", "space", ".", "-", "enter", "hide"],
+// Enough for a place name or a "lat,lon" pair. Each row is a list of keys;
+// "gap:N" is empty space (N key-widths) that centres iOS's short middle row.
+const LETTERS = [
+  "q w e r t y u i o p".split(" "),
+  ["gap:0.5", ..."asdfghjkl".split(""), "gap:0.5"],
+  ["shift", ..."zxcvbnm".split(""), "backspace"],
+  ["layer", "space", "enter"],
+];
+const NUMBERS = [
+  "1 2 3 4 5 6 7 8 9 0".split(" "),
+  ["-", "/", ":", ";", "(", ")", "$", "&", "@", '"'],
+  ["gap:2", ".", ",", "?", "!", "'", "gap:1.5", "backspace"],
+  ["layer", "space", "enter"],
 ];
 
 const SPECIAL = {
-  shift: { label: "⇧", cls: "oskKey--wide" },
-  backspace: { label: "⌫", cls: "oskKey--wide" },
+  shift: { cls: "oskKey--mod oskKey--w15" },
+  backspace: { label: "⌫", cls: "oskKey--mod oskKey--w15" },
+  layer: { cls: "oskKey--mod oskKey--w125" },
   space: { label: "space", cls: "oskKey--space" },
-  enter: { label: "Go", cls: "oskKey--wide oskKey--accent" },
-  hide: { label: "⌄", cls: "oskKey--wide" },
+  enter: { label: "Go", cls: "oskKey--accent oskKey--w2" },
 };
+
+const DOUBLE_TAP_MS = 350;
+const REPEAT_DELAY_MS = 400;
+const REPEAT_EVERY_MS = 70;
+
+// "once" = capitalise the next letter, "lock" = caps lock, "off" = lowercase.
+// On an empty field or just after a space, the next letter is a word's first.
+function autoShiftFor(el) {
+  const caret = el.selectionStart ?? el.value.length;
+  const before = el.value.slice(0, caret);
+  return before === "" || /\s$/.test(before) ? "once" : "off";
+}
 
 export default function OnScreenKeyboard() {
   const [visible, setVisible] = useState(false);
-  const [shift, setShift] = useState(false);
+  const [shift, setShift] = useState("off");
+  const [layer, setLayer] = useState("letters");
+  const [down, setDown] = useState(null); // key currently under a finger, for the pop-up
   const kbRef = useRef(null);
   const targetRef = useRef(null);
+  const lastShiftTap = useRef(0);
+  const repeatTimers = useRef({});
 
   useEffect(() => {
     let showTimer;
     function onFocusIn(e) {
       if (!isTextField(e.target)) return;
       targetRef.current = e.target;
+      // This keyboard is the input method here. Without this, a desktop
+      // environment's own on-screen keyboard (some Raspberry Pi OS images
+      // ship one) can pop up over the top of it for the same field.
+      e.target.setAttribute("inputmode", "none");
+      setShift((s) => (s === "lock" ? s : autoShiftFor(e.target)));
       // Not instant: the app renders the first-run location prompt for one
       // frame before it has read the saved location, and that prompt's field
       // autofocuses — then vanishes. Showing at once would flash (or, worse,
@@ -124,27 +155,21 @@ export default function OnScreenKeyboard() {
     };
   }, [visible]);
 
-  function insert(text) {
-    const el = targetRef.current;
-    if (!el) return;
-    el.focus();
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? start;
-    setNativeValue(el, el.value.slice(0, start) + text + el.value.slice(end));
-    const pos = start + text.length;
-    el.setSelectionRange?.(pos, pos);
-  }
+  // A key held when the keyboard goes away (or the page does) must not keep repeating.
+  useEffect(() => () => Object.values(repeatTimers.current).forEach(clearTimeout), []);
 
-  function backspace() {
+  function replaceRange(text, backspaceOnly) {
     const el = targetRef.current;
     if (!el) return;
     el.focus();
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? start;
-    // A selection deletes the selection; otherwise just the character before the caret.
-    const from = start === end ? Math.max(0, start - 1) : start;
-    setNativeValue(el, el.value.slice(0, from) + el.value.slice(end));
-    el.setSelectionRange?.(from, from);
+    // Backspace over a selection deletes the selection; otherwise one character.
+    const from = backspaceOnly && start === end ? Math.max(0, start - 1) : start;
+    setNativeValue(el, el.value.slice(0, from) + text + el.value.slice(end));
+    const pos = from + text.length;
+    el.setSelectionRange?.(pos, pos);
+    setShift((s) => (s === "lock" ? s : autoShiftFor(el)));
   }
 
   function enter() {
@@ -159,40 +184,101 @@ export default function OnScreenKeyboard() {
     setVisible(false);
   }
 
+  function pressShift() {
+    const now = Date.now();
+    const doubleTap = now - lastShiftTap.current < DOUBLE_TAP_MS;
+    lastShiftTap.current = now;
+    setShift((s) => (doubleTap ? "lock" : s === "off" ? "once" : "off"));
+  }
+
   function press(key) {
-    if (key === "shift") setShift((s) => !s);
-    else if (key === "backspace") backspace();
-    else if (key === "space") insert(" ");
+    if (key === "shift") pressShift();
+    else if (key === "backspace") replaceRange("", true);
+    else if (key === "layer") setLayer((l) => (l === "letters" ? "numbers" : "letters"));
+    else if (key === "space") replaceRange(" ");
     else if (key === "enter") enter();
-    else if (key === "hide") {
-      targetRef.current?.blur();
-      setVisible(false);
-    } else {
-      insert(shift ? key.toUpperCase() : key);
-      if (shift) setShift(false); // one-shot, like a phone
+    else replaceRange(shift !== "off" && layer === "letters" ? key.toUpperCase() : key);
+  }
+
+  function stopRepeat(key) {
+    clearTimeout(repeatTimers.current[key]);
+    delete repeatTimers.current[key];
+  }
+
+  // Keys fire on touch-down, not on release, which is what makes a keyboard
+  // feel quick. Backspace additionally keeps going while it's held.
+  function handleDown(e, key) {
+    e.preventDefault(); // keep focus in the text field
+    setDown(key);
+    press(key);
+    if (key === "backspace") {
+      const step = () => {
+        replaceRange("", true);
+        repeatTimers.current[key] = setTimeout(step, REPEAT_EVERY_MS);
+      };
+      repeatTimers.current[key] = setTimeout(step, REPEAT_DELAY_MS);
     }
+  }
+  function handleUp(key) {
+    stopRepeat(key);
+    setDown((d) => (d === key ? null : d));
   }
 
   if (!visible) return null;
+
+  const rows = layer === "letters" ? LETTERS : NUMBERS;
+  const upper = shift !== "off" && layer === "letters";
+
+  function labelFor(key) {
+    if (key === "shift") return shift === "lock" ? "⇪" : "⇧";
+    if (key === "layer") return layer === "letters" ? "123" : "ABC";
+    if (SPECIAL[key]) return SPECIAL[key].label;
+    return upper ? key.toUpperCase() : key;
+  }
 
   return (
     // mousedown's default action is moving focus onto what was tapped (taps
     // fire it too) — cancel it, or every keypress would blur the field it types into.
     <div className="osk" ref={kbRef} onMouseDown={(e) => e.preventDefault()}>
-      {ROWS.map((row, r) => (
+      <button
+        type="button"
+        tabIndex={-1}
+        className="oskHide"
+        aria-label="Hide keyboard"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          targetRef.current?.blur();
+          setVisible(false);
+        }}
+      >
+        <span />
+      </button>
+      {rows.map((row, r) => (
         <div className="oskRow" key={r}>
-          {row.map((key) => {
+          {row.map((key, i) => {
+            if (key.startsWith("gap:")) {
+              return <span key={`gap${i}`} className="oskGap" style={{ flex: `${key.slice(4)} 1 0` }} />;
+            }
             const special = SPECIAL[key];
-            const on = key === "shift" && shift;
+            const isChar = !special;
             return (
               <button
                 type="button"
                 tabIndex={-1}
                 key={key}
-                className={`oskKey${special ? ` ${special.cls}` : ""}${on ? " oskKey--on" : ""}`}
-                onClick={() => press(key)}
+                className={[
+                  "oskKey",
+                  special ? special.cls : "",
+                  key === "shift" && shift !== "off" ? "oskKey--on" : "",
+                  down === key ? "oskKey--down" : "",
+                ].join(" ")}
+                onPointerDown={(e) => handleDown(e, key)}
+                onPointerUp={() => handleUp(key)}
+                onPointerCancel={() => handleUp(key)}
+                onPointerLeave={() => handleUp(key)}
               >
-                {special ? special.label : shift ? key.toUpperCase() : key}
+                {labelFor(key)}
+                {isChar && down === key && <span className="oskPop">{labelFor(key)}</span>}
               </button>
             );
           })}

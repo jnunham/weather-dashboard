@@ -26,6 +26,7 @@ import OnScreenKeyboard from "./components/OnScreenKeyboard.jsx";
 import OutlookCard from "./components/OutlookCard.jsx";
 import Ticker from "./components/Ticker.jsx";
 import TopBar from "./components/TopBar.jsx";
+import { rememberLocation } from "./recentLocations.js";
 
 const urlParams = new URLSearchParams(window.location.search);
 const isKiosk = urlParams.get("kiosk") === "1";
@@ -76,6 +77,7 @@ function AppContent() {
   function handleLocationChange(loc) {
     setLocation(loc);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(loc));
+    rememberLocation(loc);
     setShowPrompt(false);
   }
 
@@ -84,7 +86,7 @@ function AppContent() {
   }
 
   if (isKiosk) {
-    return <KioskView location={location} />;
+    return <KioskView location={location} onLocationChange={handleLocationChange} />;
   }
 
   return (
@@ -131,6 +133,12 @@ function AppContent() {
 // on-screen one, on whichever screen it's showing (first-run location prompt,
 // kiosk, or the regular dashboard).
 export default function App() {
+  // A class on <html> (not on an element inside one screen) so CSS can tell
+  // "small touch display" apart from "narrow phone window" on every screen.
+  useEffect(() => {
+    if (isCompact) document.documentElement.classList.add("compactDisplay");
+  }, []);
+
   return (
     <>
       <AppContent />

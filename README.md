@@ -113,10 +113,20 @@ mouse attached:
 - **Swipe** left or right anywhere on the screen to move between scenes (the
   rotation timer restarts after each swipe). The map scene is locked in place
   in this mode so a swipe over it changes scene instead of panning the map.
-- An **on-screen keyboard** slides up whenever a text field is tapped — the
-  first-run location prompt, or the city box on the regular dashboard (reached
-  with the "Exit Kiosk" link, which keeps `compact=1`). **Go** submits and
-  puts the keyboard away; **⌄** just hides it.
+  The dots at the bottom are buttons too — tap one to jump to that scene, or
+  use the ‹ › arrows beside them.
+- **Change city in two taps**: tap the city name in the header, type a few
+  letters, and tap the right match from the list (US places are listed first,
+  since the data is all US National Weather Service). Places you've used
+  recently are listed with no typing at all.
+- An **iPhone-style on-screen keyboard** slides up whenever a text field is
+  tapped: a pop-up shows each key you press, shift capitalises the next letter
+  (and switches itself on at the start of each word; double-tap it for caps
+  lock), backspace repeats when held, and **123** switches to numbers and
+  punctuation. **Go** submits and puts the keyboard away; the bar across the
+  top of it hides it without submitting.
+- **Exit Kiosk** goes to the regular dashboard, which has a **🖥 Kiosk**
+  button to come straight back (both keep `compact=1`).
 
 If the dashboard doesn't appear on boot, the autostart entry is
 `~/.config/autostart/weather-dashboard-kiosk.desktop`; some Raspberry Pi OS

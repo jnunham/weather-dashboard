@@ -396,39 +396,85 @@ main.layout { display: flex; flex: 1 1 auto; min-height: 0; }
 
 /* ---------- On-screen keyboard (touch display, ?compact=1) ---------- */
 
+/* Styled after the iPhone's dark keyboard: light letter keys, darker modifier
+   keys, a blue action key, and a magnified pop-up over whatever is pressed. */
 .osk {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 10000; /* above the first-run modal (1000) */
-  background: var(--panel-bg);
-  border-top: 1px solid var(--border);
-  padding: 6px 6px 8px;
+  background: #21252e;
+  padding: 0 4px 6px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation; /* taps register at once, no double-tap-to-zoom wait */
 }
 .oskRow { display: flex; gap: 5px; }
+.oskGap { flex: 1 1 0; }
 .oskKey {
+  position: relative; /* anchors the pop-up */
   flex: 1 1 0;
   min-width: 0;
-  height: 34px;
+  height: 40px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 6px;
-  background: var(--card-bg);
-  color: var(--text);
-  font-size: 15px;
+  background: #4d5463;
+  color: #fff;
+  font: inherit;
+  font-size: 20px;
   cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+  -webkit-tap-highlight-color: transparent;
 }
-.oskKey:active, .oskKey--on { background: var(--accent); color: #06111f; border-color: var(--accent); }
-.oskKey--wide { flex: 1.6 1 0; }
-.oskKey--space { flex: 5 1 0; }
-.oskKey--accent { background: var(--accent); color: #06111f; border-color: var(--accent); font-weight: 700; }
+.oskKey--mod { background: #343a47; font-size: 16px; }
+.oskKey--on { background: #e6edf3; color: #1b1f27; }
+.oskKey--down { background: #6a7284; }
+.oskKey--mod.oskKey--down { background: #4d5463; }
+.oskKey--on.oskKey--down { background: #c8d0da; }
+.oskKey--w125 { flex: 1.25 1 0; }
+.oskKey--w15 { flex: 1.5 1 0; }
+.oskKey--w2 { flex: 2 1 0; }
+.oskKey--space { flex: 6.75 1 0; font-size: 15px; }
+.oskKey--accent { background: var(--accent); color: #06111f; font-size: 17px; font-weight: 600; }
+.oskKey--accent.oskKey--down { background: #8cc2ff; }
+
+/* The key you're touching, blown up above your finger so it's readable. */
+.oskPop {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  min-width: 52px;
+  height: 52px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #6a7284;
+  color: #fff;
+  font-size: 30px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* A slim handle across the top: tap to put the keyboard away, as on an iPad. */
+.oskHide {
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.oskHide span { width: 44px; height: 5px; border-radius: 3px; background: #5b6272; }
 
 /* While the keyboard is up, shrink the page and re-center the first-run
    prompt in what's left above it, so nothing being typed into is covered. */
@@ -439,7 +485,6 @@ html.kbOpen .modalOverlay { bottom: var(--kbHeight, 0px); }
    un-classed <p> in it) and trim padding while the keyboard is up. */
 html.kbOpen .modal { padding: 14px 18px; }
 html.kbOpen .modal > p:not([class]) { display: none; }
-
 /* ---------- Kiosk mode ---------- */
 
 /* zoom (not transform) so layout actually reflows at the larger size rather
@@ -718,8 +763,103 @@ html.kbOpen .modal > p:not([class]) { display: none; }
 .kioskSmallScreen .kioskSceneTitle { font-size: 18px; margin: 0 0 8px 0; }
 .kioskSmallScreen .kioskLoading,
 .kioskSmallScreen .kioskEmpty { font-size: 14px; }
-.kioskSmallScreen .kioskDots { padding: 6px; gap: 8px; }
+.kioskSmallScreen .kioskDots { padding: 0 6px; gap: 0; align-items: center; }
 .kioskSmallScreen .kioskDot { width: 8px; height: 8px; }
+
+/* On the touch display the dots and arrows are real buttons — big enough for
+   a finger — for moving between scenes without swiping. */
+.kioskDotButton,
+.kioskNavArrow {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.kioskDotButton { width: 34px; height: 26px; }
+.kioskNavArrow { width: 56px; height: 26px; font-size: 24px; line-height: 1; }
+.kioskDotButton:active .kioskDot { background: var(--accent); }
+.kioskNavArrow:active { color: var(--accent); }
+
+/* The city name is a button on the touch display: tap to change it. */
+.kioskLocationButton {
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  padding: 0 0 1px;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.kioskLocationCaret { color: var(--accent); font-size: 0.7em; }
+.kioskSmallScreen .kioskExit { padding: 6px 12px; font-size: 12px; }
+
+/* "Change city" sheet (tap the city name in the touch display's header). It
+   sits at the top of what's left above the keyboard. */
+.quickLoc { align-items: flex-start; }
+.quickLocSheet {
+  width: 100%;
+  max-width: 560px;
+  margin-top: 8px;
+  padding: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.quickLocForm { display: flex; gap: 8px; }
+.quickLocForm input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 20px;
+}
+.quickLocClose {
+  width: 44px;
+  height: 44px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+.quickLocRecent { color: var(--muted); margin-right: 10px; }
+.quickLocList { display: flex; flex-direction: column; gap: 6px; }
+.quickLocRow {
+  height: 40px;
+  padding: 0 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
+}
+.quickLocRow:active { background: var(--accent); color: #06111f; }
+.quickLocHint { color: var(--muted); font-size: 15px; padding: 10px 4px; }
+
+/* On the small touch display the regular dashboard still needs its way back
+   into kiosk: the phone layout hides that link, which on an 800px-wide panel
+   left no way to return after leaving. */
+html.compactDisplay .kioskLink { display: inline-flex; }
 
 /* The phone layout's fixed 42vh map height is for a scrolling page; in
    kiosk the map should fill whatever space the scene has. The control row

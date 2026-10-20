@@ -70,7 +70,13 @@ export default function TopBar({ location, onLocationChange, lastUpdated }) {
         </button>
       </form>
       <div className="locationLabel">{status || location.label}</div>
-      <a className="iconButton kioskLink" href="?kiosk=1" title="Kiosk mode — full-screen, auto-rotating display">
+      {/* Keeps the small-screen flag the same way "Exit Kiosk" does, so
+          going round the loop doesn't drop the touch layout. */}
+      <a
+        className="iconButton kioskLink"
+        href={new URLSearchParams(window.location.search).get("compact") === "1" ? "?kiosk=1&compact=1" : "?kiosk=1"}
+        title="Kiosk mode — full-screen, auto-rotating display"
+      >
         🖥️ Kiosk
       </a>
       <div className="lastUpdated">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : ""}</div>

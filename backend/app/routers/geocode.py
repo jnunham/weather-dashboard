@@ -21,3 +21,8 @@ router = APIRouter(prefix="/api", tags=["geocode"])
 @router.get("/geocode")
 async def geocode(q: str = Query(..., min_length=1)):
     return await geocode_service.geocode(q)
+
+
+@router.get("/geocode/search")
+async def geocode_search(q: str = Query(..., min_length=1, max_length=100)):
+    return await geocode_service.search(q)

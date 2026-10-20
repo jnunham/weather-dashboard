@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { alertClass, fetchOutlookBreakdown, filterNearbyAlerts, fmt, minutesSince, NICE_DAY_COLORS, topAlert } from "../utils.js";
 import MapView from "./MapView.jsx";
+import QuickLocation from "./QuickLocation.jsx";
 
 const ALL_SCENES = ["map", "conditions", "days", "mds", "afd"];
 const DEFAULT_SCENE_DURATION_MS = 25 * 1000;
@@ -451,8 +452,9 @@ function stepScene(rotation, current, dir) {
   return rotation[(i + dir + rotation.length) % rotation.length];
 }
 
-export default function KioskView({ location }) {
+export default function KioskView({ location, onLocationChange }) {
   const [{ scenes, sceneDurationMs, compact }] = useState(readKioskConfig);
+  const [pickingLocation, setPickingLocation] = useState(false);
   const [now, setNow] = useState(new Date());
   const [refreshTick, setRefreshTick] = useState(0);
   const { mds, stateName } = useMesoscaleDiscussions(location, refreshTick);
@@ -473,11 +475,14 @@ export default function KioskView({ location }) {
   // a swipe just before the timer fires would skip two scenes at once.
   const [navCount, setNavCount] = useState(0);
 
+  // Held still while the city picker is open — a scene changing under
+  // someone mid-search is just annoying.
   useEffect(() => {
+    if (pickingLocation) return undefined;
     const id = setInterval(() => setSceneName((cur) => stepScene(rotation, cur, 1)), sceneDurationMs);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rotationKey, sceneDurationMs, navCount]);
+  }, [rotationKey, sceneDurationMs, navCount, pickingLocation]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
@@ -489,34 +494,76 @@ export default function KioskView({ location }) {
     return () => clearInterval(id);
   }, []);
 
-  const swipeStart = useRef(null);
-  function handlePointerDown(e) {
-    swipeStart.current = { x: e.clientX, y: e.clientY };
-  }
-  function handlePointerUp(e) {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      // Swiping left (finger moving left) reveals the next scene.
-      setSceneName((cur) => stepScene(rotation, cur, dx < 0 ? 1 : -1));
-      setNavCount((n) => n + 1);
-    }
+  function goToScene(dir) {
+    setSceneName((cur) => stepScene(rotation, cur, dir));
+    setNavCount((n) => n + 1);
   }
 
+  // Swipe detection. Deliberately belt-and-braces, since touchscreens differ
+  // in what the browser reports (real touch events, pointer events, or just
+  // emulated mouse input) and one that fails silently leaves swiping dead:
+  //  - listens to pointer events AND touch events, on window in the capture
+  //    phase so nothing inside a scene (the Leaflet map swallows plenty) can
+  //    hide the gesture;
+  //  - fires as soon as the finger has travelled far enough sideways, rather
+  //    than waiting for it to lift — a gesture the browser cancels partway
+  //    (pointercancel) still counts.
+  // A gesture started on the keyboard or the city picker is not a swipe.
+  const goToSceneRef = useRef(goToScene);
+  goToSceneRef.current = goToScene;
+  useEffect(() => {
+    if (!compact) return undefined;
+    let start = null;
+    let fired = false;
+
+    function begin(target, x, y) {
+      fired = false;
+      start = target.closest && target.closest(".osk, [data-noswipe], .kioskDots") ? null : { x, y };
+    }
+    function move(x, y) {
+      if (!start || fired) return;
+      const dx = x - start.x;
+      const dy = y - start.y;
+      if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        fired = true;
+        // Swiping left (finger moving left) reveals the next scene.
+        goToSceneRef.current(dx < 0 ? 1 : -1);
+      }
+    }
+    const end = () => {
+      start = null;
+    };
+
+    const onPointerDown = (e) => begin(e.target, e.clientX, e.clientY);
+    const onPointerMove = (e) => move(e.clientX, e.clientY);
+    const onTouchStart = (e) => e.touches[0] && begin(e.target, e.touches[0].clientX, e.touches[0].clientY);
+    const onTouchMove = (e) => e.touches[0] && move(e.touches[0].clientX, e.touches[0].clientY);
+
+    const opts = { capture: true, passive: true };
+    const handlers = [
+      ["pointerdown", onPointerDown],
+      ["pointermove", onPointerMove],
+      ["pointerup", end],
+      ["pointercancel", end],
+      ["touchstart", onTouchStart],
+      ["touchmove", onTouchMove],
+      ["touchend", end],
+      ["touchcancel", end],
+    ];
+    handlers.forEach(([name, fn]) => window.addEventListener(name, fn, opts));
+    return () => handlers.forEach(([name, fn]) => window.removeEventListener(name, fn, opts));
+  }, [compact]);
+
   return (
-    <div
-      className={`kiosk${compact ? " kioskSmallScreen" : ""}`}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={() => {
-        swipeStart.current = null;
-      }}
-    >
+    <div className={`kiosk${compact ? " kioskSmallScreen" : ""}`}>
       <header className="kioskHeader">
-        <div className="kioskLocation">{location.label}</div>
+        {compact && onLocationChange ? (
+          <button type="button" className="kioskLocation kioskLocationButton" onClick={() => setPickingLocation(true)}>
+            {location.label} <span className="kioskLocationCaret">▾</span>
+          </button>
+        ) : (
+          <div className="kioskLocation">{location.label}</div>
+        )}
         <div className="kioskClock">
           {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} &middot;{" "}
           {now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
@@ -555,10 +602,48 @@ export default function KioskView({ location }) {
       </div>
 
       <div className="kioskDots">
-        {rotation.map((s) => (
-          <span key={s} className={`kioskDot${s === scene ? " active" : ""}`} />
-        ))}
+        {/* On a touchscreen these double as the buttons for moving between
+            scenes — the sure-fire alternative to swiping. */}
+        {compact && (
+          <button type="button" className="kioskNavArrow" aria-label="Previous scene" onClick={() => goToScene(-1)}>
+            ‹
+          </button>
+        )}
+        {rotation.map((s) =>
+          compact ? (
+            <button
+              type="button"
+              key={s}
+              className="kioskDotButton"
+              aria-label={`Show ${s}`}
+              onClick={() => {
+                setSceneName(s);
+                setNavCount((n) => n + 1);
+              }}
+            >
+              <span className={`kioskDot${s === scene ? " active" : ""}`} />
+            </button>
+          ) : (
+            <span key={s} className={`kioskDot${s === scene ? " active" : ""}`} />
+          )
+        )}
+        {compact && (
+          <button type="button" className="kioskNavArrow" aria-label="Next scene" onClick={() => goToScene(1)}>
+            ›
+          </button>
+        )}
       </div>
+
+      {pickingLocation && (
+        <QuickLocation
+          current={location}
+          onClose={() => setPickingLocation(false)}
+          onSelect={(loc) => {
+            setPickingLocation(false);
+            onLocationChange(loc);
+          }}
+        />
+      )}
     </div>
   );
 }
